@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Memora — Pensamiento Editorial, Segundo Cerebro & Cloud Sync</title>
+  <meta name="description" content="Espacio de notas y segundo cerebro con diseño editorial inspirado en Craft, Bear, Supernotes y Capacities, con sincronización en tiempo real en Firebase.">
+  <link rel="stylesheet" href="css/style.css?v=2.4.0">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23d97706'><path d='M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z'/></svg>">
+</head>
+<body>
+
+  <div class="app-container">
+
+    <!-- ====================================================================
+         Sidebar: Explorador, Tipos de Objetos y Apuntes
+         ==================================================================== -->
+    <aside class="sidebar" id="sidebar" aria-label="Navegación de apuntes">
+      <div class="sidebar-header">
+        <div class="brand-badge">
+          <div class="brand-logo" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+            </svg>
+          </div>
+          <span class="brand-title">Memora</span>
+        </div>
+        <span class="brand-tag">Cloud</span>
+      </div>
+
+      <!-- Quick Actions -->
+      <div class="sidebar-quick-actions">
+        <button class="btn-primary-action" id="btnNewNote" aria-label="Crear nueva nota">
+          <svg viewBox="0 0 24 24" width="15" height="15" stroke="currentColor" stroke-width="1.5" fill="none" aria-hidden="true">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+          </svg>
+          <span>Nueva Nota</span>
+        </button>
+      </div>
+
+      <!-- Search & Command Trigger -->
+      <button class="sidebar-search-trigger" id="searchTrigger" aria-label="Abrir paleta de comandos" title="Buscar apuntes o ejecutar comandos">
+        <div class="search-hint">
+          <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="1.5" fill="none" aria-hidden="true">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          <span>Buscar o comandos...</span>
+        </div>
+        <kbd class="shortcut-kbd">Ctrl+K</kbd>
+      </button>
+
+      <!-- Capacities Object Filters -->
+      <div class="object-filter-section" aria-label="Filtrar notas por tipo">
+        <div class="object-filter-tabs" role="tablist">
+          <button class="obj-filter-btn active" data-filter="all" role="tab" aria-selected="true">Todos</button>
+          <button class="obj-filter-btn" data-filter="idea" role="tab" aria-selected="false">
+            <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="1.5" fill="none" aria-hidden="true"><path d="M9 18h6M10 22h4M15 2a7 7 0 0 0-7 7c0 2.38 1.19 4.47 3 5.74V17a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1v-2.26c1.81-1.27 3-3.36 3-5.74a7 7 0 0 0-7-7z"/></svg>
+            <span>Ideas</span>
+          </button>
+          <button class="obj-filter-btn" data-filter="project" role="tab" aria-selected="false">
+            <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="1.5" fill="none" aria-hidden="true"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+            <span>Proyectos</span>
+          </button>
+          <button class="obj-filter-btn" data-filter="research" role="tab" aria-selected="false">
+            <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="1.5" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon></svg>
+            <span>Docs</span>
+          </button>
+          <button class="obj-filter-btn" data-filter="meeting" role="tab" aria-selected="false">
+            <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="1.5" fill="none" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+            <span>Reunión</span>
+          </button>
+          <button class="obj-filter-btn" data-filter="journal" role="tab" aria-selected="false">
+            <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="1.5" fill="none" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+            <span>Diario</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Sidebar Quick Filter -->
+      <div class="sidebar-filter-wrapper">
+        <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="1.75" fill="none" aria-hidden="true">
+          <circle cx="11" cy="11" r="8"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+        <input type="text" id="sidebarQuickFilter" placeholder="Filtrar notas o #tags..." aria-label="Filtrar notas de la lista" autocomplete="off" spellcheck="false">
+        <button id="btnClearFilter" class="btn-clear-filter" title="Limpiar filtro" aria-label="Limpiar filtro" style="display: none;">✕</button>
+      </div>
+
+      <!-- Notes Feed List -->
+      <div class="nav-section-title" id="notesNavTitle" style="padding: 10px 16px 6px; display: flex; justify-content: space-between; align-items: center;">
+        <span>Apuntes Recientes</span>
+        <span id="noteCountBadge" style="font-family: var(--font-mono); font-size: 0.65rem;">3</span>
+      </div>
+
+      <div class="notes-scroll-list" id="notesList" role="list">
+        <!-- Renderizado dinámico desde app.js -->
+      </div>
+
+      <!-- Sidebar Footer -->
+      <footer class="sidebar-footer">
+        <div style="font-size: 0.72rem; color: var(--text-muted); font-family: var(--font-mono);">
+          Memora Studio
+        </div>
+
+        <div class="footer-btn-group">
+          <button class="btn-icon-subtle" id="btnOpenSettings" aria-label="Configuración de temas y tipografía" title="Preferencias de tema y lectura">
+            <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="1.5" fill="none" aria-hidden="true">
+              <circle cx="12" cy="12" r="3"></circle>
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+            </svg>
+          </button>
+        </div>
+      </footer>
+
+      <!-- Resizer divider handle -->
+      <div class="sidebar-resizer" id="sidebarResizer" title="Arrastra para redimensionar el ancho"></div>
+    </aside>
+
+    <!-- ====================================================================
+         Main Stage: Editor Editorial, Broadsheet & Red de Ideas
+         ==================================================================== -->
+    <main class="main-content">
+
+      <!-- Top Balanced Navigation Bar -->
+      <header class="telemetry-bar">
+        <div class="telemetry-left">
+          <button class="btn-icon-subtle sidebar-toggle-btn" id="btnToggleSidebar" aria-label="Alternar barra lateral">
+            <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="1.5" fill="none" aria-hidden="true">
+              <line x1="3" y1="12" x2="21" y2="12"></line>
+              <line x1="3" y1="6" x2="21" y2="6"></line>
+              <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
+          </button>
+
+          <div class="breadcrumbs">
+            <span>Memora</span>
+            <span>/</span>
+            <span class="breadcrumb-active" id="breadcrumbActive">Sesión Maestra</span>
+          </div>
+        </div>
+
+        <div class="telemetry-center">
+          <div class="view-tabs" role="tablist" aria-label="Modos de vista">
+            <div class="view-tab-indicator" id="viewTabIndicator" aria-hidden="true"></div>
+            <button class="view-tab active" id="tabEditor" role="tab" aria-selected="true" title="Editor de escritura">
+              <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="1.5" fill="none" aria-hidden="true">
+                <path d="M12 20h9"></path>
+                <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+              </svg>
+              <span>Editor</span>
+            </button>
+
+            <button class="view-tab" id="tabPreview" role="tab" aria-selected="false" title="Vista de lectura enriquecida">
+              <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="1.5" fill="none" aria-hidden="true">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                <circle cx="12" cy="12" r="3"></circle>
+              </svg>
+              <span>Lectura</span>
+            </button>
+
+            <button class="view-tab" id="tabBroadsheet" role="tab" aria-selected="false" title="Muro de tarjetas estilo Supernotes">
+              <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="1.5" fill="none" aria-hidden="true">
+                <rect x="3" y="3" width="7" height="7"></rect>
+                <rect x="14" y="3" width="7" height="7"></rect>
+                <rect x="14" y="14" width="7" height="7"></rect>
+                <rect x="3" y="14" width="7" height="7"></rect>
+              </svg>
+              <span>Muro</span>
+            </button>
+
+            <button class="view-tab" id="tabGraph" role="tab" aria-selected="false" title="Red interactiva de conexiones">
+              <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="1.5" fill="none" aria-hidden="true">
+                <circle cx="18" cy="5" r="3"></circle>
+                <circle cx="6" cy="12" r="3"></circle>
+                <circle cx="18" cy="19" r="3"></circle>
+                <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
+                <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+              </svg>
+              <span>Red</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="telemetry-right">
+          <div class="telemetry-stats-group">
+            <div class="telemetry-pill sync-pill" id="syncPill" title="Estado de guardado en la nube">
+              <div class="status-dot"></div>
+              <span>Sincronizado</span>
+            </div>
+            <div class="telemetry-pill metrics-pill" id="wordCountPill" title="Conteo de palabras">0 palabras</div>
+            <div class="telemetry-pill metrics-pill" id="readTimePill" title="Tiempo estimado de lectura">1 min</div>
+          </div>
+
+          <button class="btn-icon-subtle" id="btnToggleZen" aria-label="Alternar Modo Zen (Ctrl+.)" title="Modo Zen de Concentración (Ctrl+.)">
+            <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="1.5" fill="none" aria-hidden="true">
+              <circle cx="12" cy="12" r="10"></circle>
+              <circle cx="12" cy="12" r="4"></circle>
+            </svg>
+          </button>
+
+          <button class="btn-icon-subtle" id="btnOpenDrawer" aria-label="Abrir inspector y exportación" title="Inspector y exportación">
+            <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="1.5" fill="none" aria-hidden="true">
+              <circle cx="12" cy="12" r="1"></circle>
+              <circle cx="19" cy="12" r="1"></circle>
+              <circle cx="5" cy="12" r="1"></circle>
+            </svg>
+          </button>
+        </div>
+      </header>
+
+      <!-- Editor Scroll Viewport -->
+      <div class="editor-viewport" id="editorViewport">
+
+        <!-- Craft-Style Dynamic Cover Banner -->
+        <div class="cover-banner-container" id="coverBannerContainer">
+          <div class="cover-banner-overlay"></div>
+          <div class="cover-banner-actions">
+            <button class="btn-cover-action" id="btnChangeCover" title="Cambiar gradiente de portada">
+              <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="1.5" fill="none" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+              <span>Cambiar</span>
+            </button>
+            <button class="btn-cover-action" id="btnRemoveCover" title="Quitar portada">
+              <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="1.5" fill="none" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+              <span>Quitar</span>
+            </button>
+          </div>
+        </div>
+
+        <article class="editor-stage">
+
+          <!-- Note Metadata Ribbon (Capacities & Supernotes style) -->
+          <div class="editor-meta-ribbon">
+            <div class="meta-ribbon-left">
+              <!-- Object Type Selector -->
+              <button class="object-type-picker" id="objTypePicker" title="Cambiar tipo de apunte">
+                <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="1.5" fill="none" aria-hidden="true"><path d="M9 18h6M10 22h4M15 2a7 7 0 0 0-7 7c0 2.38 1.19 4.47 3 5.74V17a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1v-2.26c1.81-1.27 3-3.36 3-5.74a7 7 0 0 0-7-7z"/></svg>
+                <span>Idea</span>
+              </button>
+
+              <!-- Color Palette Picker (Supernotes) -->
+              <div class="color-picker-group" id="colorPickerGroup" title="Codificar color del apunte">
+                <div class="color-dot-btn color-dot-amber active" data-color="amber"></div>
+                <div class="color-dot-btn color-dot-blue" data-color="blue"></div>
+                <div class="color-dot-btn color-dot-emerald" data-color="emerald"></div>
+                <div class="color-dot-btn color-dot-purple" data-color="purple"></div>
+                <div class="color-dot-btn color-dot-rose" data-color="rose"></div>
+                <div class="color-dot-btn color-dot-slate" data-color="slate"></div>
+              </div>
+
+              <!-- Cover Banner Toggle (Craft) -->
+              <button class="btn-toggle-cover" id="btnToggleCover">
+                <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="1.5" fill="none" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+                <span>Portada</span>
+              </button>
+            </div>
+
+            <div class="tags-bar" id="tagsContainer">
+              <!-- Tags generadas dinámicamente -->
+            </div>
+            <div class="editor-date-display" id="editorDate" style="font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-muted);">Hoy</div>
+          </div>
+
+          <!-- Note Title (ContentEditable H1) -->
+          <h1
+            class="editor-title-input"
+            id="editorTitle"
+            contenteditable="true"
+            role="textbox"
+            aria-multiline="false"
+            data-placeholder="Título del apunte..."
+            spellcheck="true"
+          ></h1>
+
+          <!-- Formatting Toolbar with Image Insertion -->
+          <div class="editor-quick-toolbar" aria-label="Barra de herramientas de formato">
+            <button class="tool-btn" data-format="h1" title="Encabezado H1">H1</button>
+            <button class="tool-btn" data-format="h2" title="Encabezado H2">H2</button>
+            <div class="tool-divider"></div>
+            <button class="tool-btn" data-format="bold" title="Negrita">
+              <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="1.75" fill="none" aria-hidden="true"><path d="M6 4h8a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"></path><path d="M6 12h9a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"></path></svg>
+            </button>
+            <button class="tool-btn" data-format="italic" title="Cursiva">
+              <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="1.75" fill="none" aria-hidden="true"><line x1="19" y1="4" x2="10" y2="4"></line><line x1="14" y1="20" x2="5" y2="20"></line><line x1="15" y1="4" x2="9" y2="20"></line></svg>
+            </button>
+            <div class="tool-divider"></div>
+            <button class="tool-btn" data-format="task" title="Lista de verificación">
+              <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="1.75" fill="none" aria-hidden="true"><polyline points="9 11 12 14 22 4"></polyline><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
+            </button>
+            <button class="tool-btn" data-format="callout" title="Bloque destacado">
+              <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="1.75" fill="none" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+            </button>
+            <button class="tool-btn" data-format="code" title="Bloque de código">
+              <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="1.75" fill="none" aria-hidden="true"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>
+            </button>
+            <div class="tool-divider"></div>
+            <!-- Insert Image Button -->
+            <button class="tool-btn" id="btnInsertImage" title="Insertar Imagen (o arrastra y suelta)">
+              <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="1.75" fill="none" aria-hidden="true">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                <polyline points="21 15 16 10 5 21"></polyline>
+              </svg>
+            </button>
+            <input type="file" id="fileInputImage" accept="image/*" style="display: none;">
+          </div>
+
+          <!-- Rich Visual Editor Canvas -->
+          <div
+            class="editor-body-content"
+            id="editorBody"
+            contenteditable="true"
+            spellcheck="true"
+            role="textbox"
+            aria-multiline="true"
+            data-placeholder="Escribe tus ideas, pega imágenes con Ctrl+V o arrástralas directamente..."
+          ></div>
+
+          <!-- Rendered Reading Preview -->
+          <div class="rendered-preview" id="renderedPreview"></div>
+
+        </article>
+      </div>
+
+      <!-- Broadsheet / Cards Wall View (Supernotes style) -->
+      <section class="broadsheet-viewport" id="broadsheetContainer" aria-label="Muro de notas estilo Broadsheet">
+        <div class="broadsheet-grid" id="broadsheetGrid">
+          <!-- Renderizado dinámico de tarjetas -->
+        </div>
+      </section>
+
+      <!-- Graph View Canvas Stage -->
+      <section class="graph-view-container" id="graphContainer" aria-label="Visualizador interactivo de red de ideas">
+        <canvas id="graphCanvas"></canvas>
+
+        <div class="graph-legend-badge">
+          <span>● Conexiones por tags y referencias cruzadas</span>
+        </div>
+
+        <div class="graph-floating-controls">
+          <button class="graph-ctrl-btn" id="btnGraphZoomIn" title="Acercar" aria-label="Acercar red">
+            <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="1.5" fill="none" aria-hidden="true"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="11" y1="8" x2="11" y2="14"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg>
+          </button>
+          <button class="graph-ctrl-btn" id="btnGraphZoomOut" title="Alejar" aria-label="Alejar red">
+            <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="1.5" fill="none" aria-hidden="true"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg>
+          </button>
+          <button class="graph-ctrl-btn" id="btnGraphReset" title="Centrar vista" aria-label="Centrar red">
+            <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="1.5" fill="none" aria-hidden="true"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>
+          </button>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- ====================================================================
+         Theme & Typography Settings Modal (Bear-inspired)
+         ==================================================================== -->
+    <div class="settings-modal-backdrop" id="settingsModal" role="dialog" aria-modal="true" aria-label="Configuración de diseño">
+      <div class="settings-modal">
+        <div class="settings-header">
+          <h3 class="settings-title">Personalización & Tipografía</h3>
+          <button class="btn-icon-subtle" id="btnCloseSettings" aria-label="Cerrar modal">
+            <svg viewBox="0 0 24 24" width="15" height="15" stroke="currentColor" stroke-width="1.5" fill="none" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          </button>
+        </div>
+
+        <div class="settings-section">
+          <span class="settings-label">Catálogo de Temas</span>
+          <div class="theme-chips-grid">
+            <button class="theme-chip-btn active" data-theme="dark">
+              <span class="theme-preview-swatch" style="background: #0c0d10;"></span>
+              <span>Dark Obsidian</span>
+            </button>
+            <button class="theme-chip-btn" data-theme="paper">
+              <span class="theme-preview-swatch" style="background: #f7f4ee; border-color: #ccc;"></span>
+              <span>Warm Paper</span>
+            </button>
+            <button class="theme-chip-btn" data-theme="solarized">
+              <span class="theme-preview-swatch" style="background: #002b36;"></span>
+              <span>Solarized Teal</span>
+            </button>
+            <button class="theme-chip-btn" data-theme="dracula">
+              <span class="theme-preview-swatch" style="background: #1e1f29;"></span>
+              <span>Dracula Neon</span>
+            </button>
+            <button class="theme-chip-btn" data-theme="sepia">
+              <span class="theme-preview-swatch" style="background: #f4ecd8; border-color: #c9b99a;"></span>
+              <span>Sepia Minimal</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <span class="settings-label">Tamaño de Fuente de Lectura</span>
+          <div class="typography-btn-group">
+            <button class="typo-size-btn" data-size="small">Compacto</button>
+            <button class="typo-size-btn active" data-size="normal">Estándar</button>
+            <button class="typo-size-btn" data-size="large">Grande</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ====================================================================
+         Slide-out Drawer: Inspector de Nota & Exportación
+         ==================================================================== -->
+    <div class="drawer-backdrop" id="drawerBackdrop" aria-hidden="true"></div>
+    <aside class="slide-drawer" id="slideDrawer" aria-label="Inspector de nota" role="dialog" aria-modal="true">
+      <div class="drawer-header">
+        <span class="drawer-title">Inspector de Apunte</span>
+        <button class="btn-icon-subtle" id="btnCloseDrawer" aria-label="Cerrar inspector">
+          <svg viewBox="0 0 24 24" width="15" height="15" stroke="currentColor" stroke-width="1.5" fill="none" aria-hidden="true">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+
+      <div class="drawer-body">
+        <div class="drawer-section">
+          <div class="drawer-section-title">Telemetría de Lectura</div>
+          <div class="drawer-stat-grid">
+            <div class="drawer-stat-card">
+              <div class="drawer-stat-label">Palabras</div>
+              <div class="drawer-stat-val" id="drawerWordCount">0</div>
+            </div>
+            <div class="drawer-stat-card">
+              <div class="drawer-stat-label">Caracteres</div>
+              <div class="drawer-stat-val" id="drawerCharCount">0</div>
+            </div>
+            <div class="drawer-stat-card">
+              <div class="drawer-stat-label">Tiempo estimado</div>
+              <div class="drawer-stat-val" id="drawerReadTime">1 min</div>
+            </div>
+            <div class="drawer-stat-card">
+              <div class="drawer-stat-label">Etiquetas</div>
+              <div class="drawer-stat-val" id="drawerTagCount">0</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="drawer-section">
+          <div class="drawer-section-title">Opciones de Exportación</div>
+          <div class="export-btn-group">
+            <button class="btn-export" id="btnExportMD">
+              <span>Descargar Markdown (.md)</span>
+              <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="1.5" fill="none" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+            </button>
+            <button class="btn-export" id="btnExportHTML">
+              <span>Exportar como Página HTML (.html)</span>
+              <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="1.5" fill="none" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+            </button>
+            <button class="btn-export" id="btnExportJSON">
+              <span>Copia completa en JSON (.json)</span>
+              <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="1.5" fill="none" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="drawer-section" style="margin-top: 30px;">
+          <button class="btn-export" id="btnDeleteCurrentNote" style="color: #ef4444; border-color: rgba(239, 68, 68, 0.2);">
+            <span>Eliminar Apunte</span>
+            <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="1.5" fill="none" aria-hidden="true"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+          </button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ====================================================================
+         Command Palette Modal (⌘K / Ctrl+K)
+         ==================================================================== -->
+    <div class="cmd-backdrop" id="cmdBackdrop" role="dialog" aria-modal="true" aria-label="Buscador y paleta de comandos">
+      <div class="cmd-palette">
+        <div class="cmd-search-box">
+          <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="1.5" fill="none" aria-hidden="true">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          <input
+            type="text"
+            class="cmd-input"
+            id="cmdInput"
+            placeholder="Buscar notas, cambiar temas o ejecutar acciones..."
+            autocomplete="off"
+            role="combobox"
+            aria-autocomplete="list"
+            aria-controls="cmdResults"
+          >
+        </div>
+        <div class="cmd-results-list" id="cmdResults" role="listbox" aria-label="Resultados de comandos">
+          <!-- Opciones dinámicas -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Floating Selection Bubble Toolbar (Craft / Medium Style) -->
+    <div class="floating-selection-toolbar" id="floatingToolbar" role="toolbar" aria-label="Barra de formato rápido">
+      <button class="float-tool-btn" data-format="bold" title="Negrita (Ctrl+B)">
+        <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="2" fill="none" aria-hidden="true"><path d="M6 4h8a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"></path><path d="M6 12h9a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"></path></svg>
+      </button>
+      <button class="float-tool-btn" data-format="italic" title="Cursiva (Ctrl+I)">
+        <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="1.75" fill="none" aria-hidden="true"><line x1="19" y1="4" x2="10" y2="4"></line><line x1="14" y1="20" x2="5" y2="20"></line><line x1="15" y1="4" x2="9" y2="20"></line></svg>
+      </button>
+      <button class="float-tool-btn" data-format="h2" title="Subtítulo H2">H2</button>
+      <button class="float-tool-btn" data-format="code" title="Código">
+        <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="1.75" fill="none" aria-hidden="true"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>
+      </button>
+      <button class="float-tool-btn" data-format="callout" title="Bloque destacado">
+        <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="1.75" fill="none" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+      </button>
+      <button class="float-tool-btn" data-format="task" title="Tarea">
+        <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="1.75" fill="none" aria-hidden="true"><polyline points="9 11 12 14 22 4"></polyline><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
+      </button>
+    </div>
+
+    <!-- Custom Context Menu (Radix Context Menu Standard) -->
+    <div class="context-menu" id="contextMenu" role="menu" aria-label="Menú contextual de nota">
+      <div class="context-menu-item" id="ctxPin" role="menuitem">
+        <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="1.5" fill="none" aria-hidden="true">
+          <line x1="12" y1="17" x2="12" y2="22"></line>
+          <path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a1 1 0 0 0 0-2H8a1 1 0 0 0 0 2h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V17z"></path>
+        </svg>
+        <span id="ctxPinLabel">Fijar apunte</span>
+      </div>
+      <div class="context-menu-divider"></div>
+      <div class="context-menu-item" id="ctxDuplicate" role="menuitem">
+        <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="1.5" fill="none" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+        <span>Duplicar apunte</span>
+      </div>
+      <div class="context-menu-item" id="ctxExport" role="menuitem">
+        <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="1.5" fill="none" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+        <span>Exportar Markdown</span>
+      </div>
+      <div class="context-menu-divider"></div>
+      <div class="context-menu-item context-menu-danger" id="ctxDelete" role="menuitem">
+        <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="1.5" fill="none" aria-hidden="true"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+        <span>Eliminar</span>
+      </div>
+    </div>
+
+    <!-- Slash Command Popover (/ in editor) -->
+    <div class="slash-menu" id="slashMenu" role="menu" aria-label="Insertar bloque">
+      <div class="slash-menu-header">Insertar bloque</div>
+      <div class="slash-menu-items" id="slashMenuItems">
+        <!-- Generado dinámicamente -->
+      </div>
+    </div>
+
+    <!-- Wiki-Link Autocomplete Popover ([[ in editor) -->
+    <div class="wiki-autocomplete-menu" id="wikiLinkMenu" role="listbox" aria-label="Conectar con nota">
+      <div class="wiki-menu-header">
+        <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="1.5" fill="none" aria-hidden="true">
+          <circle cx="18" cy="5" r="3"></circle>
+          <circle cx="6" cy="12" r="3"></circle>
+          <circle cx="18" cy="19" r="3"></circle>
+          <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
+          <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+        </svg>
+        <span>Vincular con apunte existente</span>
+      </div>
+      <div class="wiki-menu-list" id="wikiMenuList">
+        <!-- Generado dinámicamente -->
+      </div>
+    </div>
+
+    <!-- Floating Zen Exit Pill -->
+    <button class="zen-exit-pill" id="btnExitZen" aria-label="Salir del Modo Zen" title="Salir del Modo Zen (Esc o Ctrl+.)">
+      <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="2" fill="none" aria-hidden="true">
+        <line x1="18" y1="6" x2="6" y2="18"></line>
+        <line x1="6" y1="6" x2="18" y2="18"></line>
+      </svg>
+      <span>Salir de Zen</span>
+      <kbd>Esc</kbd>
+    </button>
+
+    <!-- Toast Notifications Feedback -->
+    <div class="toast-container" id="toastContainer" aria-live="polite"></div>
+
+  </div>
+
+  <!-- JavaScript Module Entry -->
+  <script type="module" src="js/app.js?v=2.4.0"></script>
+</body>
+</html>

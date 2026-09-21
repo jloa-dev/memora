@@ -1,0 +1,763 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Memora — Donde el Caos Mental se Convierte en Arquitectura de Pensamiento</title>
+  <meta name="description" content="Espacio de notas editorial y segundo cerebro con diseño Suizo minimalista, grafo relacional y sincronización en la nube en tiempo real.">
+
+  <!-- Google Fonts: Plus Jakarta Sans, Newsreader, JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,400;1,6..72,600&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="css/landing.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%232563eb'><path d='M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5'/></svg>">
+</head>
+<body>
+
+  <!-- Ambient Decorative Background Layers -->
+  <div class="ambient-bg" aria-hidden="true"></div>
+  <div class="ambient-grid" aria-hidden="true"></div>
+
+  <!-- ====================================================================
+       NAVBAR (Sticky Glassmorphic)
+       ==================================================================== -->
+  <header class="navbar" id="navbar">
+    <div class="container nav-container">
+      <a href="#hero" class="nav-brand" aria-label="Memora Inicio">
+        <div class="nav-brand-logo" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+          </svg>
+        </div>
+        <span>Memora</span>
+        <span class="nav-brand-badge">v2.4</span>
+      </a>
+
+      <nav aria-label="Navegación principal">
+        <ul class="nav-links">
+          <li><a href="#features" class="nav-link">Capacidades</a></li>
+          <li><a href="#stageSection" class="nav-link">Visor 3D</a></li>
+          <li><a href="#pricingSection" class="nav-link">Precios</a></li>
+          <li><a href="#faqSection" class="nav-link">FAQ</a></li>
+        </ul>
+      </nav>
+
+      <div class="nav-actions">
+        <!-- Command Palette Trigger Button -->
+        <button class="kbd-badge" id="cmdPaletteTrigger" title="Abrir paleta de comandos (Ctrl+K)" aria-label="Abrir paleta de comandos rápida">
+          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          <span>Buscar</span>
+          <kbd>Ctrl+K</kbd>
+        </button>
+
+        <!-- Audio Haptic Switch -->
+        <button class="btn-icon" id="audioToggleBtn" title="Alternar audio háptico táctil" aria-label="Sonido háptico de interfaz" aria-pressed="true">
+          <svg class="icon-sound-on" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+            <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+          </svg>
+          <svg class="icon-sound-off" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="display:none;" aria-hidden="true">
+            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+            <line x1="23" y1="9" x2="17" y2="15"></line>
+            <line x1="17" y1="9" x2="23" y2="15"></line>
+          </svg>
+        </button>
+
+        <!-- Theme Switcher -->
+        <button class="btn-icon" id="themeToggleBtn" title="Cambiar tema claro / oscuro" aria-label="Alternar tema de interfaz">
+          <svg class="icon-sun" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="5"></circle>
+            <line x1="12" y1="1" x2="12" y2="3"></line>
+            <line x1="12" y1="21" x2="12" y2="23"></line>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+            <line x1="1" y1="12" x2="3" y2="12"></line>
+            <line x1="21" y1="12" x2="23" y2="12"></line>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+          </svg>
+          <svg class="icon-moon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="display:none;" aria-hidden="true">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+          </svg>
+        </button>
+
+        <!-- Quick Capture Drawer Button -->
+        <button class="btn-secondary" id="openDrawerBtn" aria-label="Abrir simulador de captura rápida">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12 5v14M5 12h14"></path>
+          </svg>
+          <span>Captura Rápida</span>
+        </button>
+
+        <!-- Primary CTA to the App -->
+        <a href="index.html" class="btn-primary" aria-label="Abrir aplicación Memora">
+          <span>Abrir Memora</span>
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M5 12h14M12 5l7 7-7 7"></path>
+          </svg>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- ====================================================================
+       HERO SECTION (Above-The-Fold Optimized)
+       ==================================================================== -->
+  <main>
+    <section class="hero-section" id="hero">
+      <div class="container">
+        
+        <div class="hero-telemetry-chip">
+          <span class="led-indicator" aria-hidden="true"></span>
+          <span>Motor Sync P2P v2.4 Activo</span>
+          <span style="opacity: 0.4;">|</span>
+          <span style="font-family: var(--font-mono); color: var(--color-primary);" id="telemetryLatency">0.12ms</span>
+        </div>
+
+        <h1 class="hero-title">
+          Donde el caos mental se transforma en <span class="editorial-italic">arquitectura</span> de pensamiento puro.
+        </h1>
+
+        <p class="hero-subtitle">
+          Un espacio editorial y segundo cerebro concebido para capturar ideas a la velocidad de la luz, estructurar conocimiento complejo y sincronizarlo sin fricción en todos tus dispositivos.
+        </p>
+
+        <div class="hero-ctas">
+          <a href="index.html" class="btn-primary" style="padding: 14px 28px; font-size: 1rem;">
+            <span>Comenzar a Pensar Gratis</span>
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M5 12h14M12 5l7 7-7 7"></path>
+            </svg>
+          </a>
+
+          <a href="#stageSection" class="btn-secondary" style="padding: 14px 24px; font-size: 1rem;">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <polygon points="5 3 19 12 5 21 5 3"></polygon>
+            </svg>
+            <span>Ver Visor Interactivo 3D</span>
+          </a>
+        </div>
+
+        <!-- Telemetry Stats Strip -->
+        <div class="hero-stats">
+          <div class="stat-item">
+            <span class="stat-value">0.12ms</span>
+            <span class="stat-label">Latencia de Sync Local</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-value">100%</span>
+            <span class="stat-label">Offline-First & P2P</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-value">Zero</span>
+            <span class="stat-label">Fricción Cognitiva</span>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ====================================================================
+         STAGE ESPACIAL 3D & VISOR INTERACTIVO (21st.dev Standard)
+         ==================================================================== -->
+    <section class="stage-section" id="stageSection">
+      <div class="container">
+        
+        <div class="stage-wrapper" id="stageWrapper">
+          
+          <div class="stage-toolbar">
+            <div class="stage-modes" role="tablist" aria-label="Modos de visualización del modelo">
+              <button class="mode-btn active" data-mode="notebook" role="tab" aria-selected="true">
+                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                  <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+                  <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+                </svg>
+                <span>Vista Editorial</span>
+              </button>
+
+              <button class="mode-btn" data-mode="graph" role="tab" aria-selected="false">
+                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                  <circle cx="18" cy="5" r="3"></circle>
+                  <circle cx="6" cy="12" r="3"></circle>
+                  <circle cx="18" cy="19" r="3"></circle>
+                  <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
+                  <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+                </svg>
+                <span>Grafo Neuronal</span>
+              </button>
+
+              <button class="mode-btn" data-mode="raw" role="tab" aria-selected="false">
+                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                  <polyline points="16 18 22 12 16 6"></polyline>
+                  <polyline points="8 6 2 12 8 18"></polyline>
+                </svg>
+                <span>Esquema Raw JSON</span>
+              </button>
+            </div>
+
+            <div class="stage-telemetry-pill">
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="8" x2="12" y2="12"></line>
+                <line x1="12" y1="16" x2="12.01" y2="16"></line>
+              </svg>
+              <span>Gira el cursor para rotar en 3D</span>
+            </div>
+          </div>
+
+          <!-- 3D Perspective Canvas Container -->
+          <div class="stage-3d-box" id="stage3dBox">
+            
+            <div class="stage-glare" id="stageGlare" aria-hidden="true"></div>
+
+            <!-- View 1: Notebook Simulation -->
+            <div class="stage-view active" data-view="notebook">
+              <div class="notebook-sim">
+                <div class="sim-header">
+                  <div class="sim-doc-title">
+                    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="var(--color-primary)" stroke-width="2" aria-hidden="true">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    </svg>
+                    <span>Teoría del Segundo Cerebro & Flujo Cognitivo</span>
+                  </div>
+                  <div class="tag-cloud">
+                    <span class="chip-tag">#arquitectura</span>
+                    <span class="chip-tag">#sistemas</span>
+                    <span class="chip-tag" style="color: var(--color-emerald);">● Sincronizado</span>
+                  </div>
+                </div>
+
+                <div class="sim-blocks-grid">
+                  <div class="sim-block-main">
+                    <p class="sim-paragraph">
+                      La memoria de trabajo biológica está optimizada para procesar ideas en tiempo presente, no para almacenarlas indefinidamente. Cuando volcamos las entidades de conocimiento en un lienzo sin barreras visuales, desbloqueamos la síntesis de alto orden.
+                    </p>
+                    <div class="sim-callout">
+                      <strong>Principio Editorial Suizo:</strong> Cada nota es un átomo semántico que puede vincularse bidireccionalmente hacia infinitos horizontes cognitivos.
+                    </div>
+                    <p class="sim-paragraph" style="font-size: 0.88rem; color: var(--text-subtle);">
+                      Última modificación: hace 2 minutos vía Cloud Sync Firestore. Cero conflictos de concurrencia.
+                    </p>
+                  </div>
+
+                  <div class="sim-block-side">
+                    <div class="sim-widget">
+                      <div class="widget-title">
+                        <span>Conexiones Activas</span>
+                        <span style="color: var(--color-primary); font-family: var(--font-mono);">4 nodos</span>
+                      </div>
+                      <div style="display: flex; flex-direction: column; gap: 8px;">
+                        <a href="#" class="chip-tag" style="text-decoration:none; display:block;">↗ Síntesis de Proyectos</a>
+                        <a href="#" class="chip-tag" style="text-decoration:none; display:block;">↗ Modelos Mentales 2026</a>
+                        <a href="#" class="chip-tag" style="text-decoration:none; display:block;">↗ Capacities & Craft UX</a>
+                      </div>
+                    </div>
+
+                    <div class="sim-widget">
+                      <div class="widget-title">
+                        <span>Metadatos Rápidos</span>
+                      </div>
+                      <div style="font-size: 0.78rem; font-family: var(--font-mono); color: var(--text-muted); display: flex; flex-direction: column; gap: 4px;">
+                        <div>Palabras: <strong>148</strong></div>
+                        <div>Lectura: <strong>45s</strong></div>
+                        <div>Índice: <strong>Vectorial In-Memory</strong></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Interactive Hotspots -->
+              <div class="hotspot hotspot-1" tabindex="0" role="button" aria-label="Hotspot de Tipografía Editorial">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+                  <line x1="12" y1="5" x2="12" y2="19"></line>
+                  <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+                <div class="hotspot-tooltip">Tipografía Editorial Optimizada para Lectura Prolongada</div>
+              </div>
+
+              <div class="hotspot hotspot-2" tabindex="0" role="button" aria-label="Hotspot de Bloques Semánticos">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+                  <line x1="12" y1="5" x2="12" y2="19"></line>
+                  <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+                <div class="hotspot-tooltip">Bloques Semánticos Reorganizados al Vuelo</div>
+              </div>
+
+              <div class="hotspot hotspot-3" tabindex="0" role="button" aria-label="Hotspot de Enlaces Bidireccionales">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+                  <line x1="12" y1="5" x2="12" y2="19"></line>
+                  <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+                <div class="hotspot-tooltip">Vínculos Cruzados Bidireccionales Automáticos</div>
+              </div>
+
+            </div>
+
+            <!-- View 2: Relational Graph Simulation -->
+            <div class="stage-view" data-view="graph">
+              <div class="graph-sim">
+                <svg class="graph-svg" viewBox="0 0 800 380" aria-label="Visualización de Grafo Neuronal">
+                  <!-- Connection Lines -->
+                  <line x1="400" y1="190" x2="220" y2="100" stroke="var(--color-primary)" stroke-width="1.5" stroke-dasharray="4 4" opacity="0.6" />
+                  <line x1="400" y1="190" x2="580" y2="100" stroke="var(--color-primary)" stroke-width="1.5" opacity="0.6" />
+                  <line x1="400" y1="190" x2="240" y2="280" stroke="var(--color-secondary)" stroke-width="1.5" opacity="0.6" />
+                  <line x1="400" y1="190" x2="560" y2="280" stroke="var(--color-accent)" stroke-width="1.5" opacity="0.6" />
+                  <line x1="220" y1="100" x2="240" y2="280" stroke="var(--border-color)" stroke-width="1" />
+                  <line x1="580" y1="100" x2="560" y2="280" stroke="var(--border-color)" stroke-width="1" />
+
+                  <!-- Center Node: Memora Hub -->
+                  <circle cx="400" cy="190" r="28" fill="var(--color-primary)" />
+                  <text x="400" y="195" text-anchor="middle" fill="#ffffff" font-family="var(--font-mono)" font-size="12" font-weight="700">MEMORA</text>
+
+                  <!-- Secondary Nodes -->
+                  <circle cx="220" cy="100" r="18" fill="var(--surface-card)" stroke="var(--color-primary)" stroke-width="2" />
+                  <text x="220" y="104" text-anchor="middle" fill="var(--text-main)" font-family="var(--font-mono)" font-size="10">Modelos</text>
+
+                  <circle cx="580" cy="100" r="20" fill="var(--surface-card)" stroke="var(--color-primary)" stroke-width="2" />
+                  <text x="580" y="104" text-anchor="middle" fill="var(--text-main)" font-family="var(--font-mono)" font-size="10">Proyectos</text>
+
+                  <circle cx="240" cy="280" r="16" fill="var(--surface-card)" stroke="var(--color-secondary)" stroke-width="2" />
+                  <text x="240" y="284" text-anchor="middle" fill="var(--text-main)" font-family="var(--font-mono)" font-size="9">Lecturas</text>
+
+                  <circle cx="560" cy="280" r="19" fill="var(--surface-card)" stroke="var(--color-accent)" stroke-width="2" />
+                  <text x="560" y="284" text-anchor="middle" fill="var(--text-main)" font-family="var(--font-mono)" font-size="10">Estrategia</text>
+                </svg>
+              </div>
+            </div>
+
+            <!-- View 3: Raw Schema JSON -->
+            <div class="stage-view" data-view="raw">
+              <pre class="raw-sim"><code>{
+  "$schema": "https://memora.app/schema/v2/note.json",
+  "documentId": "doc_9f82ab7c10",
+  "title": "Teoría del Segundo Cerebro & Flujo Cognitivo",
+  "created_at": "2026-09-21T01:00:00Z",
+  "sync": {
+    "engine": "P2P-Firestore-Hybrid",
+    "latency_ms": 0.12,
+    "vector_indexed": true,
+    "encryption": "AES-GCM-256"
+  },
+  "blocks": [
+    { "type": "header_1", "text": "Teoría del Segundo Cerebro" },
+    { "type": "paragraph", "text": "La memoria de trabajo biológica..." },
+    { "type": "callout", "variant": "swiss-accent", "text": "Principio Editorial..." }
+  ],
+  "links": ["doc_models_2026", "doc_craft_ux_notes"]
+}</code></pre>
+            </div>
+
+          </div>
+
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ====================================================================
+         BENTO GRID: CAPACIDADES CLAVE (Asymmetric Layout)
+         ==================================================================== -->
+    <section class="features-section" id="features">
+      <div class="container">
+        
+        <div class="section-header">
+          <span class="section-badge">Excelencia Operativa</span>
+          <h2 class="section-title">Diseñado para la velocidad del pensamiento humano</h2>
+          <p class="section-subtitle">
+            Herramientas artesanales que eliminan la barrera entre la concepción de una idea y su estructuración definitiva.
+          </p>
+        </div>
+
+        <div class="bento-grid">
+          
+          <!-- Bento Card 1 (Large) -->
+          <div class="bento-card card-large">
+            <div class="bento-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.75">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                <line x1="3" y1="9" x2="21" y2="9"></line>
+                <line x1="9" y1="21" x2="9" y2="9"></line>
+              </svg>
+            </div>
+            <h3 class="bento-title">Tipos de Objetos Vivos & Jerarquía Fluida</h3>
+            <p class="bento-desc">
+              Organiza ideas, proyectos, notas de investigación y bitácoras con tipado semántico. No son simples archivos de texto plano: son entidades reactivas interconectables con soporte nativo para bloques de código, citas y metadatos.
+            </p>
+            <div class="bento-interactive-snippet">
+              <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 8px;">
+                <span style="color: var(--color-primary); font-weight: 700;">● Entidad:</span>
+                <span>Nota Editorial</span>
+                <span style="opacity: 0.5;">→</span>
+                <span style="color: var(--color-emerald); font-weight: 600;">Proyecto Vinculado</span>
+              </div>
+              <div style="font-size: 0.74rem; opacity: 0.8;">Índice bidireccional recalculado en tiempo real sin recarga de página.</div>
+            </div>
+          </div>
+
+          <!-- Bento Card 2 (Medium) -->
+          <div class="bento-card card-medium">
+            <div class="bento-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.75">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
+            </div>
+            <h3 class="bento-title">Buscador Instantáneo en Memoria</h3>
+            <p class="bento-desc">
+              Paleta de comandos con indexación en memoria. Presiona <kbd class="kbd-badge">Ctrl+K</kbd> y encuentra cualquier concepto o etiqueta en menos de 8 milisegundos.
+            </p>
+          </div>
+
+          <!-- Bento Card 3 (Half) -->
+          <div class="bento-card card-half">
+            <div class="bento-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.75">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+              </svg>
+            </div>
+            <h3 class="bento-title">Privacidad Cero-Conocimiento</h3>
+            <p class="bento-desc">
+              Tus apuntes se almacenan en tu dispositivo localmente antes de sincronizarse mediante cifrado de extremo a extremo. Nadie, ni siquiera nuestros servidores, puede leer tus pensamientos.
+            </p>
+          </div>
+
+          <!-- Bento Card 4 (Half) -->
+          <div class="bento-card card-half">
+            <div class="bento-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.75">
+                <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"></path>
+              </svg>
+            </div>
+            <h3 class="bento-title">Sincronización P2P & Nube Sin Fricción</h3>
+            <p class="bento-desc">
+              Trabaja en un tren sin conexión. Al recuperar señal, Memora concilia deltas automáticamente sin duplicar notas ni provocar conflictos destructivos.
+            </p>
+          </div>
+
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ====================================================================
+         PRICING & CALCULADORA DINÁMICA
+         ==================================================================== -->
+    <section class="pricing-section" id="pricingSection">
+      <div class="container">
+        
+        <div class="section-header">
+          <span class="section-badge">Transparencia Total</span>
+          <h2 class="section-title">Inversión simple para mentes de alto rendimiento</h2>
+          <p class="section-subtitle">Empieza gratis de por vida. Escala si tu volumen de conocimiento lo requiere.</p>
+        </div>
+
+        <div class="pricing-toggle-wrapper">
+          <span style="font-size: 0.9rem; font-weight: 600;">Facturación:</span>
+          <div class="toggle-switch" role="group" aria-label="Ciclo de Facturación">
+            <button class="toggle-opt" id="optMonthly" aria-pressed="false">Mensual</button>
+            <button class="toggle-opt active" id="optAnnual" aria-pressed="true">
+              Anual <span class="save-pill">-25%</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="pricing-cards">
+          
+          <!-- Free Tier -->
+          <div class="price-card">
+            <h3 class="price-tier-name">Individual</h3>
+            <p class="price-desc">Para creadores, estudiantes e investigadores independientes.</p>
+            <div class="price-amount-box">
+              <span class="price-currency">$</span>
+              <span class="price-number" data-tier="starter">0</span>
+              <span class="price-period">/ mes</span>
+            </div>
+            <ul class="price-features">
+              <li class="feature-li">
+                <svg class="feature-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                <span>Notas y entidades ilimitadas</span>
+              </li>
+              <li class="feature-li">
+                <svg class="feature-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                <span>Almacenamiento Local Offline</span>
+              </li>
+              <li class="feature-li">
+                <svg class="feature-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                <span>Paleta de comandos instantánea</span>
+              </li>
+            </ul>
+            <a href="index.html" class="btn-secondary" style="width: 100%;">Comenzar Gratis</a>
+          </div>
+
+          <!-- Pro Tier (Featured) -->
+          <div class="price-card featured">
+            <span class="featured-badge">Más Elegido</span>
+            <h3 class="price-tier-name">Pro Editorial</h3>
+            <p class="price-desc">Para autores, ingenieros y fundadores que viven en sus notas.</p>
+            <div class="price-amount-box">
+              <span class="price-currency">$</span>
+              <span class="price-number" data-tier="pro">9</span>
+              <span class="price-period">/ mes</span>
+            </div>
+            <ul class="price-features">
+              <li class="feature-li">
+                <svg class="feature-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                <span>Todo lo de Individual</span>
+              </li>
+              <li class="feature-li">
+                <svg class="feature-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                <span>Sync multi-dispositivo ilimitado</span>
+              </li>
+              <li class="feature-li">
+                <svg class="feature-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                <span>Grafo interactivo 3D completo</span>
+              </li>
+              <li class="feature-li">
+                <svg class="feature-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                <span>Historial de versiones sin límite</span>
+              </li>
+            </ul>
+            <a href="index.html" class="btn-primary" style="width: 100%;">Probar Pro 14 Días</a>
+          </div>
+
+          <!-- Team Tier -->
+          <div class="price-card">
+            <h3 class="price-tier-name">Workspace Colectivo</h3>
+            <p class="price-desc">Para estudios de diseño y colectivos de investigación.</p>
+            <div class="price-amount-box">
+              <span class="price-currency">$</span>
+              <span class="price-number" data-tier="team">24</span>
+              <span class="price-period">/ mes</span>
+            </div>
+            <ul class="price-features">
+              <li class="feature-li">
+                <svg class="feature-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                <span>Todo lo de Pro</span>
+              </li>
+              <li class="feature-li">
+                <svg class="feature-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                <span>Espacios compartidos en tiempo real</span>
+              </li>
+              <li class="feature-li">
+                <svg class="feature-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                <span>Exportación automatizada a Markdown/PDF</span>
+              </li>
+            </ul>
+            <a href="index.html" class="btn-secondary" style="width: 100%;">Contactar Ventas</a>
+          </div>
+
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ====================================================================
+         FAQ ACCORDION
+         ==================================================================== -->
+    <section class="faq-section" id="faqSection">
+      <div class="container">
+        
+        <div class="section-header">
+          <span class="section-badge">Dudas Habituales</span>
+          <h2 class="section-title">Preguntas Frecuentes</h2>
+        </div>
+
+        <div class="faq-list">
+          
+          <div class="faq-item">
+            <button class="faq-question" aria-expanded="false">
+              <span>¿Cómo protege Memora mis notas y privacidad?</span>
+              <svg class="faq-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <polyline points="6 9 12 15 18 9"></polyline>
+              </svg>
+            </button>
+            <div class="faq-answer">
+              <p>Memora opera bajo una arquitectura offline-first con almacenamiento primario en IndexedDB dentro de tu propio navegador. Si activas Cloud Sync, la sincronización se realiza con canales encriptados de extremo a extremo.</p>
+            </div>
+          </div>
+
+          <div class="faq-item">
+            <button class="faq-question" aria-expanded="false">
+              <span>¿Puedo importar mis notas desde Obsidian, Notion o Bear?</span>
+              <svg class="faq-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <polyline points="6 9 12 15 18 9"></polyline>
+              </svg>
+            </button>
+            <div class="faq-answer">
+              <p>Sí. Memora admite importación universal de carpetas en Markdown plano (.md) y JSON estructurado conservando etiquetas, jerarquías y fechas originales.</p>
+            </div>
+          </div>
+
+          <div class="faq-item">
+            <button class="faq-question" aria-expanded="false">
+              <span>¿Funciona sin conexión a internet?</span>
+              <svg class="faq-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <polyline points="6 9 12 15 18 9"></polyline>
+              </svg>
+            </button>
+            <div class="faq-answer">
+              <p>Completamente. Puedes crear, buscar y enlazar notas en aviones o zonas sin cobertura. En cuanto recuperes la conexión, los cambios se concilian automáticamente.</p>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+    </section>
+  </main>
+
+  <!-- ====================================================================
+       COMMAND PALETTE MODAL (Ctrl+K / ⌘K)
+       ==================================================================== -->
+  <div class="command-palette-backdrop" id="cmdPaletteBackdrop" role="dialog" aria-modal="true" aria-label="Paleta de Comandos">
+    <div class="command-palette-modal">
+      <div class="cmd-input-wrapper">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <circle cx="11" cy="11" r="8"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+        <input type="text" class="cmd-input" id="cmdPaletteInput" placeholder="Escribe un comando o navega..." autocomplete="off" spellcheck="false">
+        <kbd class="kbd-badge">ESC para salir</kbd>
+      </div>
+
+      <div class="cmd-results" role="listbox">
+        <div class="cmd-item" data-action="quick-capture" role="option">
+          <div class="cmd-item-left">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <path d="M12 5v14M5 12h14"></path>
+            </svg>
+            <span>Crear Apunte Rápido</span>
+          </div>
+          <span class="cmd-kbd">Drawer</span>
+        </div>
+
+        <div class="cmd-item" data-action="open-stage" role="option">
+          <div class="cmd-item-left">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <polygon points="5 3 19 12 5 21 5 3"></polygon>
+            </svg>
+            <span>Ir al Visor 3D Interactivo</span>
+          </div>
+          <span class="cmd-kbd">Scroll</span>
+        </div>
+
+        <div class="cmd-item" data-action="open-pricing" role="option">
+          <div class="cmd-item-left">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <line x1="12" y1="1" x2="12" y2="23"></line>
+              <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+            </svg>
+            <span>Consultar Planes y Precios</span>
+          </div>
+          <span class="cmd-kbd">Planes</span>
+        </div>
+
+        <div class="cmd-item" data-action="toggle-theme" role="option">
+          <div class="cmd-item-left">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <circle cx="12" cy="12" r="5"></circle>
+              <line x1="12" y1="1" x2="12" y2="3"></line>
+            </svg>
+            <span>Alternar Tema Claro / Oscuro</span>
+          </div>
+          <span class="cmd-kbd">Toggle</span>
+        </div>
+
+        <div class="cmd-item" data-action="toggle-audio" role="option">
+          <div class="cmd-item-left">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+            </svg>
+            <span>Alternar Audio Háptico Táctil</span>
+          </div>
+          <span class="cmd-kbd">Audio</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====================================================================
+       SLIDE-OUT DRAWER (Quick Capture Simulator)
+       ==================================================================== -->
+  <div class="drawer-backdrop" id="drawerBackdrop" aria-hidden="true"></div>
+  <aside class="slide-drawer" id="slideDrawer" aria-label="Simulador de captura de notas">
+    <div class="drawer-header">
+      <div class="drawer-title">Captura Rápida de Pensamiento</div>
+      <button class="btn-icon" id="closeDrawerBtn" aria-label="Cerrar panel de captura">✕</button>
+    </div>
+
+    <div class="drawer-content">
+      <div class="drawer-input-group">
+        <label for="quickNoteTitle" class="drawer-label">Título del Apunte</label>
+        <input type="text" id="quickNoteTitle" class="drawer-input" placeholder="Ej: Nueva arquitectura de grafos..." autocomplete="off">
+      </div>
+
+      <div class="drawer-input-group">
+        <label for="quickNoteBody" class="drawer-label">Cuerpo / Pensamiento</label>
+        <textarea id="quickNoteBody" class="drawer-textarea" placeholder="Escribe aquí tu flujo de conciencia. El motor local lo estructurará automáticamente..."></textarea>
+      </div>
+
+      <div class="drawer-input-group">
+        <span class="drawer-label">Tipo de Entidad</span>
+        <div style="display: flex; gap: 8px; margin-top: 4px;">
+          <span class="chip-tag" style="background: var(--color-primary-light); color: var(--color-primary); font-weight: 600;">#idea</span>
+          <span class="chip-tag">#proyecto</span>
+          <span class="chip-tag">#investigacion</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="drawer-footer">
+      <button class="btn-secondary" id="btnCancelQuickNote" onclick="document.getElementById('closeDrawerBtn').click()">Cancelar</button>
+      <button class="btn-primary" id="btnSaveQuickNote">Guardar y Sincronizar</button>
+    </div>
+  </aside>
+
+  <!-- Live Toast Notification Element -->
+  <div id="liveToast" style="position: fixed; bottom: 24px; right: 24px; background: var(--surface-card); border: 1px solid var(--color-emerald); color: var(--text-main); padding: 12px 20px; border-radius: var(--radius-md); box-shadow: var(--shadow-lg); z-index: 1000; font-size: 0.88rem; font-weight: 600; display: none; align-items: center; gap: 8px;" role="status">
+  </div>
+
+  <style>
+    #liveToast.active {
+      display: flex !important;
+      animation: toast-in 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    @keyframes toast-in {
+      from { transform: translateY(12px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+  </style>
+
+  <!-- ====================================================================
+       FOOTER
+       ==================================================================== -->
+  <footer class="footer">
+    <div class="container footer-content">
+      <div class="footer-brand">
+        <div class="nav-brand-logo" aria-hidden="true" style="width: 24px; height: 24px;">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+          </svg>
+        </div>
+        <span style="font-weight: 700; font-size: 0.95rem;">Memora</span>
+        <span class="footer-copy">© 2026 Memora Space. Cero Slop. Filosofía Editorial Pura.</span>
+      </div>
+
+      <div class="footer-links">
+        <a href="#hero" class="footer-link">Inicio</a>
+        <a href="#features" class="footer-link">Capacidades</a>
+        <a href="#pricingSection" class="footer-link">Planes</a>
+        <a href="index.html" class="footer-link" style="color: var(--color-primary); font-weight: 600;">Abrir Aplicación ↗</a>
+      </div>
+    </div>
+  </footer>
+
+  <script src="js/landing.js"></script>
+</body>
+</html>

@@ -1,0 +1,17 @@
+# Firebase
+.firebase/
+firebase-debug.log*
+firestore-debug.log*
+
+# OS & Temp
+.DS_Store
+Thumbs.db
+*.tmp
+*.log
+
+# Dependencies / IDE / Agent Skills
+.agents/
+skills-lock.json
+node_modules/
+.vscode/
+.idea/
