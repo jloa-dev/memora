@@ -224,6 +224,45 @@ export class CommandPalette {
         icon: '<svg viewBox="0 0 24 24" width="15" height="15" stroke="currentColor" stroke-width="1.75" fill="none"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>',
         shortcut: 'Ctrl+E',
         action: () => this.app.openExportDrawer()
+      },
+      {
+        id: 'cmd_google_auth',
+        title: this.app.currentUser ? 'Cerrar sesión de Google' : 'Iniciar sesión con Google (Cloud Sync)',
+        category: 'action',
+        badgeText: 'CUENTA',
+        badgeClass: 'cmd-badge-action',
+        boxClass: 'box-action',
+        icon: '<svg viewBox="0 0 24 24" width="15" height="15" stroke="currentColor" stroke-width="1.75" fill="none"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>',
+        shortcut: 'Cuenta',
+        action: () => {
+          if (this.app.currentUser) {
+            this.app.handleSignOut();
+          } else {
+            this.app.handleGoogleLogin();
+          }
+        }
+      },
+      {
+        id: 'cmd_sync_cloud',
+        title: 'Sincronizar notas con Firebase Cloud',
+        category: 'action',
+        badgeText: 'NUBE',
+        badgeClass: 'cmd-badge-action',
+        boxClass: 'box-action',
+        icon: '<svg viewBox="0 0 24 24" width="15" height="15" stroke="currentColor" stroke-width="1.75" fill="none"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>',
+        shortcut: 'Nube',
+        action: () => this.app.handleForceSyncCloud()
+      },
+      {
+        id: 'cmd_open_trash',
+        title: 'Abrir Papelera de Reciclaje',
+        category: 'action',
+        badgeText: 'PAPELERA',
+        badgeClass: 'cmd-badge-action',
+        boxClass: 'box-action',
+        icon: '<svg viewBox="0 0 24 24" width="15" height="15" stroke="currentColor" stroke-width="1.75" fill="none"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>',
+        shortcut: 'Papelera',
+        action: () => this.app.openTrashModal()
       }
     ];
   }
@@ -232,12 +271,13 @@ export class CommandPalette {
     const q = query.trim().toLowerCase();
     const staticCmds = this.getDefaultCommands();
     const rawTagQ = q.startsWith('#') ? q.slice(1).trim() : q;
+    const activeNotes = this.app.getActiveNotes ? this.app.getActiveNotes() : this.app.notes.filter(n => !n.isDeleted);
 
     this.sections = [];
 
     if (!q) {
       // Estado Inicial: Mostrar Proyectos/Apuntes Recientes, Etiquetas Populares y Acciones
-      const recentNotes = [...this.app.notes]
+      const recentNotes = [...activeNotes]
         .slice(0, 5)
         .map(n => {
           const isProject = n.type === 'project';
@@ -259,7 +299,7 @@ export class CommandPalette {
 
       // Recolectar tags del espacio
       const tagMap = new Map();
-      this.app.notes.forEach(n => {
+      activeNotes.forEach(n => {
         (n.tags || []).forEach(t => {
           if (!tagMap.has(t)) tagMap.set(t, []);
           tagMap.get(t).push(n);
@@ -303,12 +343,19 @@ export class CommandPalette {
 
       this.sections.push({
         id: 'sec_actions',
-        title: 'Acciones Rápidas',
+        title: 'Acciones & Comandos',
         icon: '<svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="1.75" fill="none"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>',
-        items: staticCmds.map(c => ({
-          ...c,
-          titleHtml: escapeHtml(c.title),
-          snippetHtml: ''
+        items: staticCmds.map(cmd => ({
+          id: cmd.id,
+          title: cmd.title,
+          titleHtml: escapeHtml(cmd.title),
+          snippetHtml: '',
+          badgeText: cmd.badgeText,
+          badgeClass: cmd.badgeClass,
+          boxClass: cmd.boxClass,
+          icon: cmd.icon,
+          shortcut: cmd.shortcut,
+          action: cmd.action
         }))
       });
     } else {
@@ -318,7 +365,7 @@ export class CommandPalette {
 
       // SECCIÓN 1: TÍTULOS DE PROYECTOS Y APUNTES
       const titleMatches = [];
-      this.app.notes.forEach(n => {
+      activeNotes.forEach(n => {
         const title = n.title || '';
         if (title.toLowerCase().includes(q)) {
           const isProject = n.type === 'project';
@@ -342,7 +389,7 @@ export class CommandPalette {
       // SECCIÓN 2: POR TAGS / ETIQUETAS
       const tagMatches = [];
       if (rawTagQ) {
-        this.app.notes.forEach(n => {
+        activeNotes.forEach(n => {
           (n.tags || []).forEach(tag => {
             if (tag.toLowerCase().includes(rawTagQ)) {
               tagMatches.push({
@@ -365,7 +412,7 @@ export class CommandPalette {
       // SECCIÓN 3: PALABRAS CLAVE EN NOTAS (CONTENIDO INTERNO)
       const contentMatches = [];
       if (q.length >= 2) {
-        this.app.notes.forEach(n => {
+        activeNotes.forEach(n => {
           const content = n.content || '';
           if (content.toLowerCase().includes(q)) {
             const snippet = extractContextSnippet(content, q);

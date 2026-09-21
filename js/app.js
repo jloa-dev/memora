@@ -162,31 +162,189 @@ export class MemoraApp {
     this.initCloudSync();
   }
 
-  async initCloudSync() {
+  initCloudSync() {
     firebaseSync.onStatusChange((status, text) => {
       this.updateSyncBadge(status, text);
     });
 
-    const remoteNotes = await firebaseSync.loadNotes();
-    if (remoteNotes && remoteNotes.length > 0) {
-      this.notes = remoteNotes;
+    firebaseSync.onAuthStateChange(async (user) => {
+      await this.handleAuthState(user);
+    });
+  }
+
+  async handleAuthState(user) {
+    this.currentUser = user;
+    this.updateAuthUI(user);
+    await this.syncUserData(user);
+  }
+
+  updateAuthUI(user) {
+    const isLogged = !!user;
+
+    // Sidebar auth widget
+    if (this.dom.authLoggedOut) this.dom.authLoggedOut.style.display = isLogged ? 'none' : 'block';
+    if (this.dom.authLoggedIn) this.dom.authLoggedIn.style.display = isLogged ? 'block' : 'none';
+
+    // Settings modal auth widget
+    if (this.dom.settingsAuthLoggedOut) this.dom.settingsAuthLoggedOut.style.display = isLogged ? 'none' : 'block';
+    if (this.dom.settingsAuthLoggedIn) this.dom.settingsAuthLoggedIn.style.display = isLogged ? 'block' : 'none';
+
+    if (user) {
+      const displayName = user.displayName || user.email?.split('@')[0] || 'Usuario';
+      const email = user.email || '';
+      const initial = (displayName || email || 'U')[0].toUpperCase();
+
+      if (this.dom.userDisplayName) this.dom.userDisplayName.textContent = displayName;
+      if (this.dom.userEmail) this.dom.userEmail.textContent = email;
+      if (this.dom.settingsDisplayName) this.dom.settingsDisplayName.textContent = displayName;
+      if (this.dom.settingsEmail) this.dom.settingsEmail.textContent = email;
+      if (this.dom.settingsUid) this.dom.settingsUid.textContent = user.uid;
+
+      if (user.photoURL) {
+        if (this.dom.userAvatarImg) {
+          this.dom.userAvatarImg.src = user.photoURL;
+          this.dom.userAvatarImg.style.display = 'block';
+        }
+        if (this.dom.userAvatarFallback) this.dom.userAvatarFallback.style.display = 'none';
+
+        if (this.dom.settingsAvatarImg) {
+          this.dom.settingsAvatarImg.src = user.photoURL;
+          this.dom.settingsAvatarImg.style.display = 'block';
+        }
+        if (this.dom.settingsAvatarFallback) this.dom.settingsAvatarFallback.style.display = 'none';
+      } else {
+        if (this.dom.userAvatarImg) this.dom.userAvatarImg.style.display = 'none';
+        if (this.dom.userAvatarFallback) {
+          this.dom.userAvatarFallback.textContent = initial;
+          this.dom.userAvatarFallback.style.display = 'flex';
+        }
+
+        if (this.dom.settingsAvatarImg) this.dom.settingsAvatarImg.style.display = 'none';
+        if (this.dom.settingsAvatarFallback) {
+          this.dom.settingsAvatarFallback.textContent = initial;
+          this.dom.settingsAvatarFallback.style.display = 'flex';
+        }
+      }
+    }
+  }
+
+  createStarterUserNotes(user) {
+    const name = user?.displayName ? user.displayName.split(' ')[0] : 'Usuario';
+    return [
+      {
+        id: 'note_' + Date.now(),
+        title: `Mi Espacio de Notas`,
+        type: 'idea',
+        color: 'amber',
+        isPinned: true,
+        cover: 'linear-gradient(135deg, #1e3a8a 0%, #3b82f6 50%, #93c5fd 100%)',
+        tags: ['Personal', 'Primer Apunte'],
+        updatedAt: new Date().toISOString(),
+        content: `# Bienvenido a tu Espacio Personal
+
+Hola ${name}, este es tu cuaderno exclusivo en la nube. Todas las notas y proyectos que crees aquí están vinculados únicamente a tu cuenta de Google (${user?.email || ''}) y se sincronizan en tiempo real mediante Firebase Firestore.
+
+### Características de tu cuenta
+- [x] **Aislamiento total**: Las notas de este espacio son tuyas y privadas.
+- [x] **Sincronización en la nube**: Cualquier cambio se guarda al instante en tu Firestore.
+- [x] **Organización**: Usa tipos de apuntes (Idea, Proyecto, Docs, etc.) y fija notas clave arriba.
+
+Escribe libremente aquí tu primer apunte o pensamiento.`
+      }
+    ];
+  }
+
+  async syncUserData(user) {
+    if (user) {
+      // 1. Cargar notas desde el Firestore exclusivo de este usuario
+      const remoteNotes = await firebaseSync.loadNotes();
+      if (remoteNotes && remoteNotes.length > 0) {
+        remoteNotes.sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0));
+        this.notes = remoteNotes;
+      } else {
+        // Usuario nuevo: revisar si ya tenía notas en su propio almacenamiento local aislado
+        const userLocalKey = `memora_user_${user.uid}_notes`;
+        const localSaved = localStorage.getItem(userLocalKey);
+        if (localSaved) {
+          try {
+            this.notes = JSON.parse(localSaved);
+          } catch (e) {
+            this.notes = this.createStarterUserNotes(user);
+          }
+        } else {
+          this.notes = this.createStarterUserNotes(user);
+        }
+        await firebaseSync.uploadNotesBatch(this.notes);
+      }
+
       this.saveLocalNotes();
       this.renderNoteList();
-      if (!this.activeNoteId || !this.notes.find(n => n.id === this.activeNoteId)) {
+      if (this.notes.length > 0) {
+        this.selectNote(this.notes[0].id, false);
+      }
+
+      // 2. Escuchar cambios en vivo exclusivamente de este usuario
+      firebaseSync.listenLiveUpdates((updatedNotes) => {
+        if (updatedNotes && updatedNotes.length > 0) {
+          updatedNotes.sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0));
+          this.notes = updatedNotes;
+          this.saveLocalNotes();
+          this.renderNoteList();
+          if (this.currentView === 'broadsheet') this.renderBroadsheet();
+          if (this.currentView === 'graph' && this.graph) this.graph.setData(this.notes);
+        }
+      });
+    } else {
+      // Sesión cerrada / Modo invitado: cargar espacio de invitado totalmente separado
+      this.loadLocalNotes();
+      this.renderNoteList();
+      if (this.notes.length > 0) {
         this.selectNote(this.notes[0].id, false);
       }
     }
+  }
 
-    // Escuchar cambios en vivo de Firestore
-    firebaseSync.listenLiveUpdates((updatedNotes) => {
-      if (updatedNotes && updatedNotes.length > 0) {
-        this.notes = updatedNotes;
-        this.saveLocalNotes();
-        this.renderNoteList();
-        if (this.currentView === 'broadsheet') this.renderBroadsheet();
-        if (this.currentView === 'graph' && this.graph) this.graph.setData(this.notes);
+  async handleGoogleLogin() {
+    try {
+      this.showToast('Iniciando sesión con Google...');
+      const user = await firebaseSync.signInWithGoogle();
+      this.showToast(`¡Sesión iniciada como ${user.displayName || 'Usuario'}!`);
+    } catch (err) {
+      console.warn('Google sign-in error:', err);
+      if (err.code === 'auth/popup-closed-by-user') {
+        this.showToast('Inicio de sesión cancelado.');
+      } else if (err.code === 'auth/unauthorized-domain') {
+        this.showToast('Dominio no autorizado en Firebase Console.');
+      } else {
+        this.showToast('Error al conectar con Google.');
       }
-    });
+    }
+  }
+
+  async handleSignOut() {
+    try {
+      await firebaseSync.signOutUser();
+      this.currentUser = null;
+      this.updateAuthUI(null);
+      this.loadLocalNotes();
+      this.renderNoteList();
+      if (this.notes.length > 0) {
+        this.selectNote(this.notes[0].id, false);
+      }
+      this.showToast('Has cerrado sesión en Google.');
+    } catch (err) {
+      console.warn('Signout error:', err);
+    }
+  }
+
+  async handleForceSyncCloud() {
+    if (!firebaseSync.currentUser) {
+      this.showToast('Inicia sesión con Google para sincronizar en la nube.');
+      return;
+    }
+    this.showToast('Sincronizando notas con Firebase...');
+    await firebaseSync.uploadNotesBatch(this.notes);
+    this.showToast('Notas sincronizadas en la nube.');
   }
 
   updateSyncBadge(status, text) {
@@ -235,18 +393,36 @@ export class MemoraApp {
     if (notify) this.showToast(`Tamaño de fuente: ${size}`);
   }
 
+  getStorageKey() {
+    if (this.currentUser && this.currentUser.uid) {
+      return `memora_user_${this.currentUser.uid}_notes`;
+    }
+    return 'memora_guest_notes';
+  }
+
   loadLocalNotes() {
     try {
-      const data = localStorage.getItem(STORAGE_KEY) || localStorage.getItem(LEGACY_STORAGE_KEY);
-      this.notes = data ? JSON.parse(data) : SEED_NOTES;
+      const key = this.getStorageKey();
+      const data = localStorage.getItem(key);
+      if (data) {
+        this.notes = JSON.parse(data);
+      } else {
+        if (this.currentUser) {
+          this.notes = this.createStarterUserNotes(this.currentUser);
+        } else {
+          this.notes = SEED_NOTES;
+        }
+      }
     } catch (e) {
-      this.notes = SEED_NOTES;
+      this.notes = this.currentUser ? this.createStarterUserNotes(this.currentUser) : SEED_NOTES;
     }
+    this.notes.sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0));
   }
 
   saveLocalNotes() {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(this.notes));
+      const key = this.getStorageKey();
+      localStorage.setItem(key, JSON.stringify(this.notes));
     } catch (e) {}
   }
 
@@ -301,7 +477,32 @@ export class MemoraApp {
       wikiLinkMenu: document.getElementById('wikiLinkMenu'),
       wikiMenuList: document.getElementById('wikiMenuList'),
       ctxPin: document.getElementById('ctxPin'),
-      ctxPinLabel: document.getElementById('ctxPinLabel')
+      ctxPinLabel: document.getElementById('ctxPinLabel'),
+      btnGoogleSignIn: document.getElementById('btnGoogleSignIn'),
+      btnSignOut: document.getElementById('btnSignOut'),
+      authLoggedOut: document.getElementById('authLoggedOut'),
+      authLoggedIn: document.getElementById('authLoggedIn'),
+      userAvatarImg: document.getElementById('userAvatarImg'),
+      userAvatarFallback: document.getElementById('userAvatarFallback'),
+      userDisplayName: document.getElementById('userDisplayName'),
+      userEmail: document.getElementById('userEmail'),
+      btnSettingsGoogleSignIn: document.getElementById('btnSettingsGoogleSignIn'),
+      btnSettingsSignOut: document.getElementById('btnSettingsSignOut'),
+      btnForceSyncCloud: document.getElementById('btnForceSyncCloud'),
+      settingsAuthLoggedOut: document.getElementById('settingsAuthLoggedOut'),
+      settingsAuthLoggedIn: document.getElementById('settingsAuthLoggedIn'),
+      settingsAvatarImg: document.getElementById('settingsAvatarImg'),
+      settingsAvatarFallback: document.getElementById('settingsAvatarFallback'),
+      settingsDisplayName: document.getElementById('settingsDisplayName'),
+      settingsEmail: document.getElementById('settingsEmail'),
+      settingsUid: document.getElementById('settingsUid'),
+      btnOpenTrash: document.getElementById('btnOpenTrash'),
+      btnCloseTrash: document.getElementById('btnCloseTrash'),
+      btnEmptyTrash: document.getElementById('btnEmptyTrash'),
+      trashModal: document.getElementById('trashModal'),
+      trashList: document.getElementById('trashList'),
+      trashEmptyState: document.getElementById('trashEmptyState'),
+      trashBadgeCount: document.getElementById('trashBadgeCount')
     };
 
     // Configuración de titleInput (ContentEditable H1)
@@ -377,6 +578,54 @@ export class MemoraApp {
     this.dom.settingsModal?.addEventListener('click', (e) => {
       if (e.target === this.dom.settingsModal) {
         this.dom.settingsModal.classList.remove('open');
+      }
+    });
+
+    // Google Auth & Cloud Sync Actions
+    this.dom.btnGoogleSignIn?.addEventListener('click', () => {
+      haptics.playTap();
+      this.handleGoogleLogin();
+    });
+
+    this.dom.btnSettingsGoogleSignIn?.addEventListener('click', () => {
+      haptics.playTap();
+      this.handleGoogleLogin();
+    });
+
+    this.dom.btnSignOut?.addEventListener('click', () => {
+      haptics.playTap();
+      this.handleSignOut();
+    });
+
+    this.dom.btnSettingsSignOut?.addEventListener('click', () => {
+      haptics.playTap();
+      this.handleSignOut();
+    });
+
+    this.dom.btnForceSyncCloud?.addEventListener('click', () => {
+      haptics.playTap();
+      this.handleForceSyncCloud();
+    });
+
+    // Trash Modal Actions
+    this.dom.btnOpenTrash?.addEventListener('click', () => {
+      haptics.playTap();
+      this.openTrashModal();
+    });
+
+    this.dom.btnCloseTrash?.addEventListener('click', () => {
+      haptics.playTap();
+      this.closeTrashModal();
+    });
+
+    this.dom.btnEmptyTrash?.addEventListener('click', () => {
+      haptics.playTap();
+      this.emptyTrash();
+    });
+
+    this.dom.trashModal?.addEventListener('click', (e) => {
+      if (e.target === this.dom.trashModal) {
+        this.closeTrashModal();
       }
     });
 
@@ -478,6 +727,13 @@ export class MemoraApp {
     this.dom.btnToggleCover?.addEventListener('click', () => this.toggleCover());
     this.dom.btnChangeCover?.addEventListener('click', () => this.changeCoverPrompt());
     this.dom.btnRemoveCover?.addEventListener('click', () => this.removeCover());
+
+    // Fijar / Desfijar apunte activo
+    document.getElementById('btnTogglePin')?.addEventListener('click', () => {
+      if (this.activeNoteId) {
+        this.togglePinNote(this.activeNoteId);
+      }
+    });
 
     // Inserción de Imágenes
     document.getElementById('btnInsertImage')?.addEventListener('click', () => {
@@ -740,6 +996,9 @@ export class MemoraApp {
       card.classList.toggle('selected', card.getAttribute('data-id') === id);
     });
 
+    // Actualizar botón de fijar en la cabecera del editor
+    this.updateEditorPinButton(!!(note.isPinned || note.pinned));
+
     if (window.innerWidth <= 900) {
       this.dom.sidebar.classList.remove('open');
     }
@@ -766,8 +1025,65 @@ export class MemoraApp {
     this.updateSidebarCard(note);
     this.renderRenderedPreview(note.content);
 
+    // Mover inmediatamente la nota al inicio de su sección en el panel lateral (orden por modificación)
+    this.reorderCardToTop(note);
+
     if (this.graph && this.currentView === 'graph') {
       this.graph.setData(this.notes);
+    }
+  }
+
+  reorderCardToTop(note) {
+    if (!note) return;
+
+    // 1. Reordenar en el array this.notes
+    const idx = this.notes.findIndex(n => n.id === note.id);
+    if (idx > -1) {
+      this.notes.splice(idx, 1);
+      const isPinned = !!(note.isPinned || note.pinned);
+      if (isPinned) {
+        this.notes.unshift(note);
+      } else {
+        const firstRegularIdx = this.notes.findIndex(n => !n.isPinned && !n.pinned);
+        if (firstRegularIdx === -1) {
+          this.notes.push(note);
+        } else {
+          this.notes.splice(firstRegularIdx, 0, note);
+        }
+      }
+    }
+
+    // 2. Mover el card en el DOM si no está ya en la primera posición de su grupo
+    const card = this.dom.notesList.querySelector(`.note-card-compact[data-id="${note.id}"]`);
+    if (!card) return;
+
+    // Actualizar etiqueta de fecha en la tarjeta
+    const dateSpan = card.querySelector('.note-card-header-row span[style*="font-mono"]');
+    if (dateSpan) dateSpan.textContent = 'Ahora';
+
+    const isPinned = !!(note.isPinned || note.pinned);
+    const dividers = this.dom.notesList.querySelectorAll('.nav-sub-divider');
+
+    if (isPinned) {
+      const pinDivider = dividers[0];
+      if (pinDivider && pinDivider.nextElementSibling !== card) {
+        pinDivider.insertAdjacentElement('afterend', card);
+      }
+    } else {
+      let regDivider = null;
+      dividers.forEach(d => {
+        if (d.textContent.includes('Recientes')) regDivider = d;
+      });
+
+      if (regDivider) {
+        if (regDivider.nextElementSibling !== card) {
+          regDivider.insertAdjacentElement('afterend', card);
+        }
+      } else {
+        if (this.dom.notesList.firstElementChild !== card) {
+          this.dom.notesList.prepend(card);
+        }
+      }
     }
   }
 
@@ -1312,8 +1628,11 @@ export class MemoraApp {
   // Sidebar List
   renderNoteList() {
     this.dom.notesList.innerHTML = '';
+    this.updateTrashBadge();
 
-    let filtered = this.notes.filter(note => {
+    const activeNotes = this.getActiveNotes();
+
+    let filtered = activeNotes.filter(note => {
       if (this.activeObjectFilter === 'all') return true;
       return note.type === this.activeObjectFilter;
     });
@@ -1338,10 +1657,18 @@ export class MemoraApp {
       return;
     }
 
-    const pinned = filtered.filter(n => n.isPinned);
-    const regular = filtered.filter(n => !n.isPinned);
+    // Ordenar rigurosamente por última fecha de modificación (más reciente arriba)
+    filtered.sort((a, b) => {
+      const timeA = new Date(a.updatedAt || 0).getTime();
+      const timeB = new Date(b.updatedAt || 0).getTime();
+      return timeB - timeA;
+    });
+
+    const pinned = filtered.filter(n => !!(n.isPinned || n.pinned));
+    const regular = filtered.filter(n => !n.isPinned && !n.pinned);
 
     const renderCard = (note) => {
+      const isPinned = !!(note.isPinned || note.pinned);
       const card = document.createElement('div');
       card.className = `note-card-compact ${note.id === this.activeNoteId ? 'selected' : ''}`;
       card.setAttribute('data-id', note.id);
@@ -1355,24 +1682,20 @@ export class MemoraApp {
       const previewSnippet = cleanContent.slice(0, 85) || 'Sin contenido adicional...';
       const mainTag = (note.tags && note.tags[0]) ? `#${note.tags[0]}` : 'General';
       const objMeta = OBJECT_TYPES[note.type] || OBJECT_TYPES.idea;
-      const date = new Date(note.updatedAt);
+      const date = new Date(note.updatedAt || Date.now());
       const dateStr = date.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
-
-      const pinIconHtml = note.isPinned ? `
-        <span class="note-card-pin-badge" title="Apunte fijado">
-          <svg viewBox="0 0 24 24" width="11" height="11" stroke="currentColor" stroke-width="2" fill="none">
-            <line x1="12" y1="17" x2="12" y2="22"></line>
-            <path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a1 1 0 0 0 0-2H8a1 1 0 0 0 0 2h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V17z"></path>
-          </svg>
-        </span>
-      ` : '';
 
       card.innerHTML = `
         <div class="note-card-header-row">
           <span class="note-card-obj-badge">${objMeta.icon} ${objMeta.label}</span>
-          <div style="display: flex; align-items: center; gap: 4px;">
+          <div style="display: flex; align-items: center; gap: 6px;">
             <span style="font-size: 0.65rem; color: var(--text-muted); font-family: var(--font-mono);">${dateStr}</span>
-            ${pinIconHtml}
+            <button class="btn-card-pin ${isPinned ? 'active' : ''}" data-pin-id="${note.id}" title="${isPinned ? 'Desfijar apunte' : 'Fijar apunte al inicio'}" aria-label="${isPinned ? 'Desfijar' : 'Fijar'}">
+              <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="${isPinned ? 'currentColor' : 'none'}">
+                <line x1="12" y1="17" x2="12" y2="22"></line>
+                <path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a1 1 0 0 0 0-2H8a1 1 0 0 0 0 2h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V17z"></path>
+              </svg>
+            </button>
           </div>
         </div>
         <div class="note-card-title">${note.title || 'Sin título'}</div>
@@ -1381,6 +1704,16 @@ export class MemoraApp {
           <span class="note-card-tag">${mainTag}</span>
         </div>
       `;
+
+      // Clic para fijar con un solo toque sin navegar
+      const pinBtn = card.querySelector('.btn-card-pin');
+      if (pinBtn) {
+        pinBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          e.preventDefault();
+          this.togglePinNote(note.id);
+        });
+      }
 
       card.addEventListener('click', () => {
         this.selectNote(note.id);
@@ -1395,11 +1728,12 @@ export class MemoraApp {
       const pinHeader = document.createElement('div');
       pinHeader.className = 'nav-sub-divider';
       pinHeader.innerHTML = `
-        <svg viewBox="0 0 24 24" width="11" height="11" stroke="currentColor" stroke-width="2" fill="none">
+        <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="currentColor">
           <line x1="12" y1="17" x2="12" y2="22"></line>
           <path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a1 1 0 0 0 0-2H8a1 1 0 0 0 0 2h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V17z"></path>
         </svg>
         <span>Fijadas</span>
+        <span class="count-badge">${pinned.length}</span>
       `;
       this.dom.notesList.appendChild(pinHeader);
       pinned.forEach(n => this.dom.notesList.appendChild(renderCard(n)));
@@ -1407,7 +1741,10 @@ export class MemoraApp {
       if (regular.length > 0) {
         const regHeader = document.createElement('div');
         regHeader.className = 'nav-sub-divider';
-        regHeader.innerHTML = `<span>Recientes</span>`;
+        regHeader.innerHTML = `
+          <span>Recientes</span>
+          <span class="count-badge">${regular.length}</span>
+        `;
         this.dom.notesList.appendChild(regHeader);
       }
     }
@@ -1433,12 +1770,22 @@ export class MemoraApp {
   renderBroadsheet() {
     this.dom.broadsheetGrid.innerHTML = '';
 
-    const filtered = this.notes.filter(note => {
+    const activeNotes = this.getActiveNotes();
+
+    let filtered = activeNotes.filter(note => {
       if (this.activeObjectFilter === 'all') return true;
       return note.type === this.activeObjectFilter;
     });
 
+    filtered.sort((a, b) => {
+      const pinA = !!(a.isPinned || a.pinned);
+      const pinB = !!(b.isPinned || b.pinned);
+      if (pinA !== pinB) return pinB ? 1 : -1;
+      return new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime();
+    });
+
     filtered.forEach(note => {
+      const isPinned = !!(note.isPinned || note.pinned);
       const tile = document.createElement('article');
       tile.className = 'card-tile';
 
@@ -1449,7 +1796,7 @@ export class MemoraApp {
         .replace(/[#*`>\[\]\(!\)]/g, '')
         .trim();
       const previewSnippet = cleanContent.slice(0, 140) || 'Sin contenido...';
-      const date = new Date(note.updatedAt);
+      const date = new Date(note.updatedAt || Date.now());
       const dateStr = date.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
 
       let coverHtml = '';
@@ -1465,7 +1812,17 @@ export class MemoraApp {
         <div class="card-tile-content">
           <div class="card-tile-header">
             <span class="card-tile-badge">${objMeta.icon} ${objMeta.label}</span>
-            <span style="width: 10px; height: 10px; border-radius: 50%; background: var(--note-accent);"></span>
+            <div style="display: flex; align-items: center; gap: 6px;">
+              ${isPinned ? `
+                <span title="Apunte fijado" style="color: #d97706; display: inline-flex; align-items: center;">
+                  <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="currentColor">
+                    <line x1="12" y1="17" x2="12" y2="22"></line>
+                    <path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a1 1 0 0 0 0-2H8a1 1 0 0 0 0 2h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V17z"></path>
+                  </svg>
+                </span>
+              ` : ''}
+              <span style="width: 10px; height: 10px; border-radius: 50%; background: var(--note-accent);"></span>
+            </div>
           </div>
           <h3 class="card-tile-title">${note.title || 'Sin título'}</h3>
           <p class="card-tile-snippet">${previewSnippet}</p>
@@ -1937,22 +2294,183 @@ export class MemoraApp {
     this.dom.drawerBackdrop?.classList.remove('open');
   }
 
-  deleteCurrentNote() {
-    if (this.notes.length <= 1) {
-      alert('Debes mantener al menos una nota.');
+  getActiveNotes() {
+    return this.notes.filter(n => !n.isDeleted);
+  }
+
+  getDeletedNotes() {
+    return this.notes.filter(n => !!n.isDeleted);
+  }
+
+  escapeHtml(str) {
+    if (!str) return '';
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  updateTrashBadge() {
+    const deleted = this.getDeletedNotes();
+    const count = deleted.length;
+    if (this.dom.trashBadgeCount) {
+      this.dom.trashBadgeCount.textContent = count;
+      this.dom.trashBadgeCount.style.display = count > 0 ? 'inline-block' : 'none';
+    }
+    if (this.dom.btnEmptyTrash) {
+      this.dom.btnEmptyTrash.style.display = count > 0 ? 'inline-flex' : 'none';
+    }
+  }
+
+  openTrashModal() {
+    this.renderTrashList();
+    this.dom.trashModal?.classList.add('open');
+  }
+
+  closeTrashModal() {
+    this.dom.trashModal?.classList.remove('open');
+  }
+
+  renderTrashList() {
+    if (!this.dom.trashList || !this.dom.trashEmptyState) return;
+    const deleted = this.getDeletedNotes();
+    this.updateTrashBadge();
+
+    if (deleted.length === 0) {
+      this.dom.trashEmptyState.style.display = 'flex';
+      this.dom.trashList.style.display = 'none';
+      this.dom.trashList.innerHTML = '';
       return;
     }
-    if (confirm('¿Eliminar esta nota permanentemente de Firebase y local?')) {
-      haptics.playTap();
-      const idToDelete = this.activeNoteId;
-      this.notes = this.notes.filter(n => n.id !== idToDelete);
-      this.saveLocalNotes();
-      firebaseSync.deleteNote(idToDelete);
-      this.renderNoteList();
-      this.selectNote(this.notes[0].id);
-      this.closeExportDrawer();
-      this.showToast('Nota eliminada');
+
+    this.dom.trashEmptyState.style.display = 'none';
+    this.dom.trashList.style.display = 'flex';
+    this.dom.trashList.innerHTML = '';
+
+    deleted.sort((a, b) => new Date(b.deletedAt || 0) - new Date(a.deletedAt || 0));
+
+    deleted.forEach(note => {
+      const card = document.createElement('div');
+      card.className = 'trash-item-card';
+
+      const dateStr = note.deletedAt 
+        ? new Date(note.deletedAt).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+        : 'Reciente';
+
+      card.innerHTML = `
+        <div class="trash-item-info">
+          <span class="trash-item-title">${this.escapeHtml(note.title || 'Sin título')}</span>
+          <span class="trash-item-meta">Eliminado el ${dateStr}</span>
+        </div>
+        <div class="trash-item-actions">
+          <button class="btn-trash-action btn-restore-action" data-id="${note.id}" title="Restaurar apunte">
+            <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="1.75" fill="none" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path></svg>
+            <span>Restaurar</span>
+          </button>
+          <button class="btn-trash-action btn-purge-action" data-id="${note.id}" title="Eliminar para siempre">
+            <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="1.75" fill="none" aria-hidden="true"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+            <span>Borrar</span>
+          </button>
+        </div>
+      `;
+
+      card.querySelector('.btn-restore-action').addEventListener('click', () => {
+        haptics.playTap();
+        this.restoreNote(note.id);
+      });
+
+      card.querySelector('.btn-purge-action').addEventListener('click', () => {
+        haptics.playTap();
+        this.purgeNote(note.id);
+      });
+
+      this.dom.trashList.appendChild(card);
+    });
+  }
+
+  moveToTrash(noteId) {
+    const note = this.notes.find(n => n.id === noteId);
+    if (!note) return;
+
+    note.isDeleted = true;
+    note.deletedAt = new Date().toISOString();
+    note.isPinned = false;
+
+    this.saveLocalNotes();
+    firebaseSync.saveNoteLive(note);
+
+    this.updateTrashBadge();
+    this.renderNoteList();
+
+    if (this.currentView === 'broadsheet') this.renderBroadsheet();
+    if (this.currentView === 'graph' && this.graph) this.graph.setData(this.getActiveNotes());
+
+    const active = this.getActiveNotes();
+    if (this.activeNoteId === noteId) {
+      if (active.length > 0) {
+        this.selectNote(active[0].id, false);
+      } else {
+        this.createNewNote();
+      }
     }
+
+    this.showToast('Apunte movido a la papelera');
+  }
+
+  restoreNote(noteId) {
+    const note = this.notes.find(n => n.id === noteId);
+    if (!note) return;
+
+    note.isDeleted = false;
+    note.deletedAt = null;
+    note.updatedAt = new Date().toISOString();
+
+    this.saveLocalNotes();
+    firebaseSync.saveNoteLive(note);
+
+    this.updateTrashBadge();
+    this.renderNoteList();
+    this.renderTrashList();
+    if (this.currentView === 'broadsheet') this.renderBroadsheet();
+    if (this.currentView === 'graph' && this.graph) this.graph.setData(this.getActiveNotes());
+
+    this.selectNote(note.id);
+    this.showToast('Apunte restaurado');
+  }
+
+  purgeNote(noteId) {
+    if (confirm('¿Eliminar este apunte definitivamente? No se podrá recuperar.')) {
+      this.notes = this.notes.filter(n => n.id !== noteId);
+      this.saveLocalNotes();
+      firebaseSync.deleteNote(noteId);
+      this.renderTrashList();
+      this.showToast('Apunte eliminado definitivamente');
+    }
+  }
+
+  emptyTrash() {
+    const deleted = this.getDeletedNotes();
+    if (deleted.length === 0) return;
+
+    if (confirm(`¿Vaciar la papelera? Se eliminarán definitivamente ${deleted.length} apunte(s).`)) {
+      deleted.forEach(n => {
+        firebaseSync.deleteNote(n.id);
+      });
+      this.notes = this.notes.filter(n => !n.isDeleted);
+      this.saveLocalNotes();
+      this.renderTrashList();
+      this.showToast('Papelera vaciada');
+    }
+  }
+
+  deleteCurrentNote() {
+    const active = this.getActiveNotes();
+    if (active.length <= 1) {
+      this.showToast('Debes mantener al menos una nota activa.');
+      return;
+    }
+    haptics.playTap();
+    this.moveToTrash(this.activeNoteId);
+    this.closeExportDrawer();
   }
 
   exportCurrentNote(format) {
@@ -2162,12 +2680,47 @@ export class MemoraApp {
     const note = this.notes.find(n => n.id === id);
     if (!note) return;
     note.isPinned = !note.isPinned;
+    note.pinned = note.isPinned;
     note.updatedAt = new Date().toISOString();
+
+    // Reordenar en this.notes: mover a la cima de su grupo
+    const idx = this.notes.findIndex(n => n.id === id);
+    if (idx > -1) {
+      this.notes.splice(idx, 1);
+      if (note.isPinned) {
+        this.notes.unshift(note);
+      } else {
+        const firstRegular = this.notes.findIndex(n => !n.isPinned && !n.pinned);
+        if (firstRegular === -1) {
+          this.notes.push(note);
+        } else {
+          this.notes.splice(firstRegular, 0, note);
+        }
+      }
+    }
+
     this.saveLocalNotes();
     firebaseSync.saveNoteLive(note);
     this.renderNoteList();
+
+    if (this.activeNoteId === id) {
+      this.updateEditorPinButton(note.isPinned);
+    }
+
     haptics.playTap();
     this.showToast(note.isPinned ? 'Apunte fijado al inicio' : 'Apunte desfijado');
+  }
+
+  updateEditorPinButton(isPinned) {
+    const btn = document.getElementById('btnTogglePin');
+    if (btn) {
+      btn.classList.toggle('active', !!isPinned);
+      btn.title = isPinned ? 'Desfijar este apunte' : 'Fijar este apunte al inicio';
+      const label = btn.querySelector('span');
+      if (label) label.textContent = isPinned ? 'Fijado' : 'Fijar';
+      const svg = btn.querySelector('svg');
+      if (svg) svg.setAttribute('fill', isPinned ? 'currentColor' : 'none');
+    }
   }
 
   duplicateNote(id) {

@@ -1,4 +1,20 @@
 {
+  "auth": {
+    "authorizedDomains": [
+      "localhost",
+      "memora-space.web.app",
+      "cuentas-951a9.firebaseapp.com"
+    ],
+    "providers": {
+      "googleSignIn": {
+        "oAuthBrandDisplayName": "Memora",
+        "supportEmail": "jloa.dev@gmail.com"
+      }
+    }
+  },
+  "firestore": {
+    "rules": "firestore.rules"
+  },
   "hosting": {
     "site": "memora-space",
     "public": ".",

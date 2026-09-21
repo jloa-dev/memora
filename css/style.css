@@ -541,6 +541,84 @@ body.is-resizing-sidebar * {
   align-items: center;
   justify-content: space-between;
   margin-bottom: 4px;
+  gap: 6px;
+}
+
+/* Card Pin Button (1-Click Pinning in Sidebar) */
+.btn-card-pin {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0;
+  transition: all var(--duration-fast);
+  opacity: 0;
+  flex-shrink: 0;
+}
+
+.note-card-compact:hover .btn-card-pin {
+  opacity: 0.65;
+}
+
+.btn-card-pin:hover {
+  opacity: 1 !important;
+  background: var(--bg-surface);
+  border-color: var(--border-subtle);
+  color: var(--accent);
+  transform: scale(1.15);
+}
+
+.btn-card-pin.active {
+  opacity: 1 !important;
+  color: #d97706;
+  background: rgba(217, 119, 6, 0.12);
+  border-color: rgba(217, 119, 6, 0.28);
+}
+
+.btn-card-pin.active:hover {
+  background: rgba(217, 119, 6, 0.22);
+}
+
+/* Section divider header for pinned & recent notes */
+.nav-sub-divider {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 8px 6px;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  border-top: 1px solid var(--border-subtle);
+  margin-top: 8px;
+}
+
+.nav-sub-divider:first-child {
+  border-top: none;
+  margin-top: 0;
+  padding-top: 4px;
+}
+
+.nav-sub-divider svg {
+  color: var(--accent);
+}
+
+.nav-sub-divider .count-badge {
+  font-size: 0.62rem;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  padding: 1px 6px;
+  border-radius: var(--radius-pill);
+  margin-left: auto;
+  color: var(--text-secondary);
 }
 
 .note-card-obj-badge {
@@ -937,6 +1015,38 @@ body.is-resizing-sidebar * {
 .btn-toggle-cover:hover {
   color: var(--text-primary);
   border-color: var(--border-medium);
+}
+
+/* Editor Ribbon Pin Toggle */
+.btn-toggle-pin {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  padding: 4px 9px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--bg-surface);
+  cursor: pointer;
+  transition: all var(--duration-fast);
+}
+
+.btn-toggle-pin:hover {
+  color: var(--text-primary);
+  border-color: var(--border-medium);
+  background: var(--bg-hover);
+}
+
+.btn-toggle-pin.active {
+  color: #d97706;
+  background: rgba(217, 119, 6, 0.14);
+  border-color: rgba(217, 119, 6, 0.35);
+  font-weight: 600;
+}
+
+.btn-toggle-pin.active svg {
+  fill: currentColor;
 }
 
 /* Tags bar */
@@ -2596,6 +2706,295 @@ body.zen-mode .zen-exit-pill {
 
 .wiki-link svg {
   color: var(--accent);
+}
+
+/* ==========================================================================
+   Google Authentication & User Account Profile
+   ========================================================================== */
+
+.sidebar-auth-widget {
+  margin: 8px 14px 4px;
+  padding: 6px 8px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  transition: all var(--duration-fast) var(--ease-out);
+}
+
+.sidebar-auth-widget:hover {
+  border-color: var(--border-medium);
+}
+
+.btn-google-login {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 7px 10px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 0.78rem;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: all var(--duration-fast) var(--ease-out);
+}
+
+.btn-google-login:hover {
+  background: var(--bg-hover);
+  border-color: var(--accent);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  transform: translateY(-1px);
+}
+
+.google-icon {
+  flex-shrink: 0;
+  width: 15px;
+  height: 15px;
+}
+
+.btn-google-text {
+  font-weight: 500;
+  letter-spacing: 0.01em;
+}
+
+.user-account-card {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 2px;
+}
+
+.user-avatar-wrap {
+  position: relative;
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+}
+
+.user-avatar-img {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid var(--border-medium);
+}
+
+.user-avatar-fallback {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent) 0%, #92400e 100%);
+  color: #ffffff;
+  font-size: 0.78rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  text-transform: uppercase;
+}
+
+.user-status-indicator {
+  position: absolute;
+  bottom: -1px;
+  right: -1px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #10b981;
+  border: 1.5px solid var(--bg-surface);
+  box-shadow: 0 0 5px rgba(16, 185, 129, 0.7);
+}
+
+.user-details {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.user-name {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.25;
+}
+
+.user-email {
+  font-size: 0.66rem;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.25;
+}
+
+.btn-auth-action {
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 5px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--duration-fast) var(--ease-out);
+}
+
+.btn-auth-action:hover {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.12);
+}
+
+.settings-auth-status {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 14px;
+}
+
+/* ==========================================================================
+   Papelera de Reciclaje (Trash)
+   ========================================================================== */
+
+.trash-badge-count {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  background: #ef4444;
+  color: #ffffff;
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  font-weight: 700;
+  padding: 1px 4px;
+  border-radius: 999px;
+  line-height: 1;
+  min-width: 14px;
+  text-align: center;
+}
+
+.trash-modal-dialog {
+  max-width: 580px;
+}
+
+.trash-body {
+  max-height: 60vh;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.trash-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 42px 20px;
+  text-align: center;
+}
+
+.trash-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.trash-item-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  transition: all var(--duration-fast) var(--ease-out);
+}
+
+.trash-item-card:hover {
+  border-color: var(--border-medium);
+  background: var(--bg-elevated);
+}
+
+.trash-item-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+  margin-right: 12px;
+}
+
+.trash-item-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.trash-item-meta {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  margin-top: 2px;
+}
+
+.trash-item-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.btn-trash-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  font-size: 0.74rem;
+  font-weight: 500;
+  font-family: var(--font-sans);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  border: 1px solid var(--border-medium);
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  transition: all var(--duration-fast) var(--ease-out);
+}
+
+.btn-trash-action:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.btn-restore-action:hover {
+  border-color: #10b981;
+  color: #10b981;
+  background: rgba(16, 185, 129, 0.1);
+}
+
+.btn-purge-action:hover {
+  border-color: #ef4444;
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.btn-empty-trash {
+  color: #ef4444 !important;
+  border-color: rgba(239, 68, 68, 0.3) !important;
+}
+
+.btn-empty-trash:hover {
+  background: rgba(239, 68, 68, 0.12) !important;
 }
 
 @media (prefers-reduced-motion: reduce) {

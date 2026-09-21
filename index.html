@@ -5,8 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Memora — Pensamiento Editorial, Segundo Cerebro & Cloud Sync</title>
   <meta name="description" content="Espacio de notas y segundo cerebro con diseño editorial inspirado en Craft, Bear, Supernotes y Capacities, con sincronización en tiempo real en Firebase.">
-  <link rel="stylesheet" href="css/style.css?v=2.4.0">
+  <link rel="stylesheet" href="css/style.css?v=2.7.0">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23d97706'><path d='M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z'/></svg>">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0c0d10">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Memora">
+  <link rel="apple-touch-icon" href="assets/icon-192.png">
 </head>
 <body>
 
@@ -26,6 +33,44 @@
           <span class="brand-title">Memora</span>
         </div>
         <span class="brand-tag">Cloud</span>
+      </div>
+
+      <!-- Google Authentication & User Profile Widget -->
+      <div class="sidebar-auth-widget" id="sidebarAuthWidget">
+        <!-- Estado Desconectado: Botón Iniciar Sesión con Google -->
+        <div class="auth-logged-out" id="authLoggedOut">
+          <button class="btn-google-login" id="btnGoogleSignIn" aria-label="Iniciar sesión con cuenta de Google" title="Inicia sesión con Google para sincronizar tus notas">
+            <svg class="google-icon" viewBox="0 0 24 24" width="15" height="15" aria-hidden="true">
+              <path fill="#EA4335" d="M12 5c1.6 0 3 .5 4.1 1.5l3.1-3.1C17.3 1.6 14.8 1 12 1 7.5 1 3.7 3.6 1.9 7.3l3.7 2.9C6.5 7.3 9 5 12 5z"/>
+              <path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.8z"/>
+              <path fill="#FBBC05" d="M5.6 14.8c-.2-.7-.4-1.5-.4-2.3s.2-1.6.4-2.3L1.9 7.3C.7 9.7 0 12.3 0 15.1s.7 5.4 1.9 7.8l3.7-2.9z"/>
+              <path fill="#34A853" d="M12 23.5c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2.3-6.4-5.2L1.9 16.5C3.7 20.2 7.5 23.5 12 23.5z"/>
+            </svg>
+            <span class="btn-google-text">Entrar con Google</span>
+          </button>
+        </div>
+
+        <!-- Estado Conectado: Tarjeta de Perfil de Usuario -->
+        <div class="auth-logged-in" id="authLoggedIn" style="display: none;">
+          <div class="user-account-card" id="userAccountCard" title="Cuenta Google conectada">
+            <div class="user-avatar-wrap">
+              <img class="user-avatar-img" id="userAvatarImg" alt="Avatar" src="" style="display: none;">
+              <div class="user-avatar-fallback" id="userAvatarFallback">U</div>
+              <span class="user-status-indicator" title="Conectado a Firebase Firestore"></span>
+            </div>
+            <div class="user-details">
+              <span class="user-name" id="userDisplayName">Usuario</span>
+              <span class="user-email" id="userEmail">correo@gmail.com</span>
+            </div>
+            <button class="btn-icon-subtle btn-auth-action" id="btnSignOut" aria-label="Cerrar sesión" title="Cerrar sesión">
+              <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="1.75" fill="none" aria-hidden="true">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                <polyline points="16 17 21 12 16 7"></polyline>
+                <line x1="21" y1="12" x2="9" y2="12"></line>
+              </svg>
+            </button>
+          </div>
+        </div>
       </div>
 
       <!-- Quick Actions -->
@@ -105,6 +150,13 @@
         </div>
 
         <div class="footer-btn-group">
+          <button class="btn-icon-subtle" id="btnOpenTrash" aria-label="Abrir papelera de reciclaje" title="Papelera de reciclaje">
+            <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="1.5" fill="none" aria-hidden="true">
+              <polyline points="3 6 5 6 21 6"></polyline>
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+            </svg>
+            <span class="trash-badge-count" id="trashBadgeCount" style="display: none;">0</span>
+          </button>
           <button class="btn-icon-subtle" id="btnOpenSettings" aria-label="Configuración de temas y tipografía" title="Preferencias de tema y lectura">
             <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="1.5" fill="none" aria-hidden="true">
               <circle cx="12" cy="12" r="3"></circle>
@@ -254,6 +306,15 @@
                 <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="1.5" fill="none" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
                 <span>Portada</span>
               </button>
+
+              <!-- Pin Toggle Button -->
+              <button class="btn-toggle-pin" id="btnTogglePin" title="Fijar este apunte al inicio" aria-label="Fijar apunte">
+                <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="1.8" fill="none">
+                  <line x1="12" y1="17" x2="12" y2="22"></line>
+                  <path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a1 1 0 0 0 0-2H8a1 1 0 0 0 0 2h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V17z"></path>
+                </svg>
+                <span>Fijar</span>
+              </button>
             </div>
 
             <div class="tags-bar" id="tagsContainer">
@@ -397,6 +458,52 @@
             <button class="typo-size-btn" data-size="small">Compacto</button>
             <button class="typo-size-btn active" data-size="normal">Estándar</button>
             <button class="typo-size-btn" data-size="large">Grande</button>
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <span class="settings-label">Cuenta & Nube Firebase</span>
+          <div class="settings-auth-status" id="settingsAuthStatus">
+            <div id="settingsAuthLoggedOut">
+              <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 12px; line-height: 1.45;">
+                Inicia sesión con tu cuenta de Google para sincronizar y respaldar todas tus notas y proyectos en tiempo real en Cloud Firestore.
+              </p>
+              <button class="btn-google-login" id="btnSettingsGoogleSignIn" style="justify-content: center; width: auto; display: inline-flex; padding: 7px 16px;">
+                <svg class="google-icon" viewBox="0 0 24 24" width="15" height="15" aria-hidden="true">
+                  <path fill="#EA4335" d="M12 5c1.6 0 3 .5 4.1 1.5l3.1-3.1C17.3 1.6 14.8 1 12 1 7.5 1 3.7 3.6 1.9 7.3l3.7 2.9C6.5 7.3 9 5 12 5z"/>
+                  <path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.8z"/>
+                  <path fill="#FBBC05" d="M5.6 14.8c-.2-.7-.4-1.5-.4-2.3s.2-1.6.4-2.3L1.9 7.3C.7 9.7 0 12.3 0 15.1s.7 5.4 1.9 7.8l3.7-2.9z"/>
+                  <path fill="#34A853" d="M12 23.5c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2.3-6.4-5.2L1.9 16.5C3.7 20.2 7.5 23.5 12 23.5z"/>
+                </svg>
+                <span>Conectar con Google</span>
+              </button>
+            </div>
+            <div id="settingsAuthLoggedIn" style="display: none;">
+              <div class="user-account-card" style="margin-bottom: 12px;">
+                <div class="user-avatar-wrap">
+                  <img class="user-avatar-img" id="settingsAvatarImg" alt="Avatar" src="" style="display: none;">
+                  <div class="user-avatar-fallback" id="settingsAvatarFallback">U</div>
+                  <span class="user-status-indicator" title="Conectado a Firestore"></span>
+                </div>
+                <div class="user-details">
+                  <span class="user-name" id="settingsDisplayName">Usuario</span>
+                  <span class="user-email" id="settingsEmail">correo@gmail.com</span>
+                </div>
+              </div>
+              <div style="font-size: 0.72rem; color: var(--text-muted); font-family: var(--font-mono); margin-bottom: 12px; word-break: break-all;">
+                UID Firebase: <span id="settingsUid" style="color: var(--accent);">--</span>
+              </div>
+              <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                <button class="btn-cover-action" id="btnSettingsSignOut" style="color: #ef4444; border-color: rgba(239, 68, 68, 0.3);">
+                  <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="1.75" fill="none" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+                  <span>Cerrar sesión</span>
+                </button>
+                <button class="btn-cover-action" id="btnForceSyncCloud" title="Forzar sincronización de notas en la nube">
+                  <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="1.75" fill="none" aria-hidden="true"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+                  <span>Sincronizar ahora</span>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -577,9 +684,60 @@
     <!-- Toast Notifications Feedback -->
     <div class="toast-container" id="toastContainer" aria-live="polite"></div>
 
+    <!-- ====================================================================
+         Trash Modal: Papelera de Reciclaje (Recuperar o vaciar)
+         ==================================================================== -->
+    <div class="settings-modal-backdrop" id="trashModal" role="dialog" aria-modal="true" aria-label="Papelera de reciclaje">
+      <div class="settings-modal trash-modal-dialog">
+        <div class="settings-header">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="1.5" fill="none" aria-hidden="true">
+              <polyline points="3 6 5 6 21 6"></polyline>
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+            </svg>
+            <h3 class="settings-title">Papelera de Reciclaje</h3>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <button class="btn-cover-action btn-empty-trash" id="btnEmptyTrash" title="Eliminar todas las notas de la papelera" style="display: none;">
+              <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="1.75" fill="none" aria-hidden="true"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+              <span>Vaciar Papelera</span>
+            </button>
+            <button class="btn-icon-subtle" id="btnCloseTrash" aria-label="Cerrar papelera">
+              <svg viewBox="0 0 24 24" width="15" height="15" stroke="currentColor" stroke-width="1.5" fill="none" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="trash-body">
+          <div class="trash-empty-state" id="trashEmptyState">
+            <svg viewBox="0 0 24 24" width="40" height="40" stroke="currentColor" stroke-width="1.25" fill="none" style="color: var(--text-muted); margin-bottom: 12px; opacity: 0.6;">
+              <polyline points="3 6 5 6 21 6"></polyline>
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+            </svg>
+            <p style="font-weight: 500; font-size: 0.88rem; color: var(--text-primary); margin-bottom: 4px;">La papelera está vacía</p>
+            <p style="font-size: 0.76rem; color: var(--text-muted); max-width: 320px; text-align: center; line-height: 1.45;">Los apuntes que elimines se guardarán aquí para que puedas recuperarlos en cualquier momento sin perderlos.</p>
+          </div>
+          <div class="trash-list" id="trashList" style="display: none;">
+            <!-- Renderizado dinámico desde app.js -->
+          </div>
+        </div>
+      </div>
+    </div>
+
   </div>
 
   <!-- JavaScript Module Entry -->
-  <script type="module" src="js/app.js?v=2.4.0"></script>
+  <script type="module" src="js/app.js?v=2.7.0"></script>
+
+  <!-- PWA Service Worker Registration -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js').catch((err) => {
+          console.warn('PWA Service Worker registration skipped:', err);
+        });
+      });
+    }
+  </script>
 </body>
 </html>
