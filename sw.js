@@ -2,7 +2,7 @@
  * Memora - Service Worker PWA (Offline & Standalone Desktop/Mobile Support)
  */
 
-const CACHE_NAME = 'memora-cache-v2.8.0';
+const CACHE_NAME = 'memora-cache-v2.9.0';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -45,8 +45,9 @@ self.addEventListener('fetch', (event) => {
   const req = event.request;
   const url = new URL(req.url);
 
-  // No interceptar peticiones a Firebase Firestore ni Google Auth
+  // No interceptar peticiones a Supabase PostgreSQL, Firebase Auth ni Google APIs
   if (
+    url.hostname.includes('supabase.co') ||
     url.hostname.includes('firestore.googleapis.com') ||
     url.hostname.includes('identitytoolkit.googleapis.com') ||
     url.hostname.includes('accounts.google.com') ||

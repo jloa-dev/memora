@@ -5,8 +5,8 @@
 
 import { haptics } from './audio.js';
 import { NotesGraph } from './graph.js';
-import { CommandPalette } from './commands.js?v=2.8.0';
-import { firebaseSync } from './firebase.js?v=2.8.0';
+import { CommandPalette } from './commands.js?v=2.9.0';
+import { firebaseSync } from './firebase.js?v=2.9.0';
 
 const STORAGE_KEY = 'memora_data_v1';
 const LEGACY_STORAGE_KEY = 'auranotes_data_v2';
