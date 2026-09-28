@@ -1370,6 +1370,94 @@ Escribe libremente aquí tu primer apunte o pensamiento.`
     });
   }
 
+  createLinkElement(url, label = '') {
+    let cleanUrl = (url || '').trim();
+    let trailing = '';
+    const m = cleanUrl.match(/([.,:;!?]+)$/);
+    if (m) {
+      trailing = m[1];
+      cleanUrl = cleanUrl.slice(0, -trailing.length);
+    }
+    const display = label || cleanUrl;
+
+    const linkElem = document.createElement('a');
+    linkElem.className = 'editor-link';
+    linkElem.href = cleanUrl;
+    linkElem.target = '_blank';
+    linkElem.rel = 'noopener noreferrer';
+    linkElem.contentEditable = 'false';
+    linkElem.title = `Abrir: ${cleanUrl}`;
+    linkElem.innerHTML = `<span>${this.escapeHtml(display)}</span><svg class="link-ext-icon" viewBox="0 0 24 24" width="10" height="10" stroke="currentColor" stroke-width="2" fill="none"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>`;
+
+    return { element: linkElem, trailing, cleanUrl };
+  }
+
+  parseInlineFragment(text) {
+    const frag = document.createDocumentFragment();
+    const urlRegex = /(https?:\/\/[^\s<>"'\(\)]+)/gi;
+    let lastIdx = 0;
+    let match;
+
+    while ((match = urlRegex.exec(text)) !== null) {
+      const matchIdx = match.index;
+      if (matchIdx > lastIdx) {
+        frag.appendChild(document.createTextNode(text.slice(lastIdx, matchIdx)));
+      }
+      const rawUrl = match[1];
+      const { element: linkElem, trailing } = this.createLinkElement(rawUrl);
+      frag.appendChild(linkElem);
+      if (trailing) {
+        frag.appendChild(document.createTextNode(trailing));
+      }
+      lastIdx = matchIdx + rawUrl.length;
+    }
+
+    if (lastIdx < text.length) {
+      frag.appendChild(document.createTextNode(text.slice(lastIdx)));
+    }
+    return frag;
+  }
+
+  autolinkEditorBody() {
+    if (!this.dom.editorBody) return;
+    const walker = document.createTreeWalker(
+      this.dom.editorBody,
+      NodeFilter.SHOW_TEXT,
+      {
+        acceptNode(node) {
+          if (!node.textContent || !/https?:\/\//i.test(node.textContent)) {
+            return NodeFilter.FILTER_REJECT;
+          }
+          if (node.parentElement && (node.parentElement.closest('a') || node.parentElement.closest('pre') || node.parentElement.closest('code'))) {
+            return NodeFilter.FILTER_REJECT;
+          }
+          return NodeFilter.FILTER_ACCEPT;
+        }
+      }
+    );
+
+    const textNodes = [];
+    while (walker.nextNode()) {
+      textNodes.push(walker.currentNode);
+    }
+
+    let modified = false;
+    for (const node of textNodes) {
+      const text = node.textContent;
+      if (!/https?:\/\/[^\s<>"'\(\)]+/i.test(text)) continue;
+      const frag = this.parseInlineFragment(text);
+      if (node.parentNode) {
+        node.parentNode.replaceChild(frag, node);
+        modified = true;
+      }
+    }
+
+    if (modified) {
+      this.onNoteChanged();
+      this.updateTelemetry();
+    }
+  }
+
   handlePasteImage(e) {
     const items = (e.clipboardData || e.originalEvent?.clipboardData)?.items;
     if (items) {
@@ -1393,31 +1481,53 @@ Escribe libremente aquí tu primer apunte o pensamiento.`
       return;
     }
 
-    // Soporte para pegar URLs como enlaces interactivos o vincular texto seleccionado
-    if (pastedText && /^https?:\/\/[^\s]+$/.test(pastedText.trim())) {
-      const url = pastedText.trim();
+    // Soporte para pegar URLs o texto con URLs como enlaces interactivos
+    if (pastedText && /https?:\/\/[^\s]+/i.test(pastedText)) {
       const sel = window.getSelection();
       if (sel && sel.rangeCount > 0 && this.dom.editorBody.contains(sel.getRangeAt(0).commonAncestorContainer)) {
         e.preventDefault();
+        const trimmed = pastedText.trim();
         const range = sel.getRangeAt(0);
-        const selectedText = !sel.isCollapsed ? sel.toString().trim() : url;
-        const linkElem = document.createElement('a');
-        linkElem.className = 'editor-link';
-        linkElem.href = url;
-        linkElem.target = '_blank';
-        linkElem.rel = 'noopener noreferrer';
-        linkElem.contentEditable = 'false';
-        linkElem.title = `Abrir: ${url}`;
-        linkElem.innerHTML = `<span>${this.escapeHtml(selectedText)}</span><svg class="link-ext-icon" viewBox="0 0 24 24" width="10" height="10" stroke="currentColor" stroke-width="2" fill="none"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>`;
+
+        // Caso A: Se pega exactamente una URL y el usuario tiene texto seleccionado -> enlazar el texto seleccionado
+        if (/^https?:\/\/[^\s]+$/i.test(trimmed) && !sel.isCollapsed) {
+          const selectedText = sel.toString().trim();
+          const { element: linkElem } = this.createLinkElement(trimmed, selectedText);
+          range.deleteContents();
+          range.insertNode(linkElem);
+          const space = document.createTextNode('\u00A0');
+          linkElem.parentNode.insertBefore(space, linkElem.nextSibling);
+          range.setStartAfter(space);
+          range.collapse(true);
+          sel.removeAllRanges();
+          sel.addRange(range);
+          this.onNoteChanged();
+          this.updateTelemetry();
+          return;
+        }
+
+        // Caso B: Se pega una URL o múltiples URLs / texto con URLs
+        range.deleteContents();
+        const frag = document.createDocumentFragment();
+        const lines = pastedText.split(/\r?\n/);
+        lines.forEach((line, idx) => {
+          if (idx > 0) {
+            frag.appendChild(document.createElement('br'));
+          }
+          if (line) {
+            frag.appendChild(this.parseInlineFragment(line));
+          }
+        });
 
         const space = document.createTextNode('\u00A0');
-        range.deleteContents();
-        range.insertNode(space);
-        range.insertNode(linkElem);
+        frag.appendChild(space);
+
+        range.insertNode(frag);
         range.setStartAfter(space);
         range.collapse(true);
         sel.removeAllRanges();
         sel.addRange(range);
+
         this.onNoteChanged();
         this.updateTelemetry();
         return;
@@ -1501,7 +1611,7 @@ Escribe libremente aquí tu primer apunte o pensamiento.`
         const lines = part.split('\n');
         lines.forEach((line, idx) => {
           if (idx > 0) fragment.appendChild(document.createElement('br'));
-          if (line) fragment.appendChild(document.createTextNode(line));
+          if (line) fragment.appendChild(this.parseInlineFragment(line));
         });
       }
     });
@@ -1545,7 +1655,12 @@ Escribe libremente aquí tu primer apunte o pensamiento.`
 
   setEditorContent(markdown = '') {
     this.dom.editorBody.innerHTML = '';
-    if (!markdown) return;
+    if (!markdown) {
+      const p = document.createElement('p');
+      p.innerHTML = '<br>';
+      this.dom.editorBody.appendChild(p);
+      return;
+    }
 
     // Detectar imágenes markdown o URLs Base64 directas
     const regex = /(!\[.*?\]\((?:data:image\/[^\)]+|https?:\/\/[^\s\)]+)\)|data:image\/[a-zA-Z0-9+.-]+;base64,[A-Za-z0-9+/=\s_-]+)/g;
@@ -1627,11 +1742,12 @@ Escribe libremente aquí tu primer apunte o pensamiento.`
     });
 
     this.attachCheckboxListeners();
+    this.autolinkEditorBody();
   }
 
   inlineMarkdownToHTML(text) {
     if (!text) return '';
-    // Proteger spans de color existentes
+    // 1. Proteger spans de color existentes
     const colorPlaceholders = [];
     let safe = text.replace(/<span\s+style="color:\s*([^"]+)">([\s\S]*?)<\/span>/gi, (m, color, inner) => {
       const idx = colorPlaceholders.length;
@@ -1649,14 +1765,41 @@ Escribe libremente aquí tu primer apunte o pensamiento.`
       .replace(/\[\[(.*?)\]\]/g, (match, title) => {
         const clean = title.trim();
         return `<a class="wiki-link" data-title="${clean}" contenteditable="false"><svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg><span>${clean}</span></a>`;
-      })
-      .replace(/\[([^\]]+)\]\((https?:\/\/[^\s\)]+)\)/g, (match, label, url) => {
-        return `<a class="editor-link" href="${url}" target="_blank" rel="noopener noreferrer" contenteditable="false" title="Abrir: ${url}"><span>${label}</span><svg class="link-ext-icon" viewBox="0 0 24 24" width="10" height="10" stroke="currentColor" stroke-width="2" fill="none"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg></a>`;
-      })
-      .replace(/(?<!href=["'])(https?:\/\/[^\s<]+[^<.,:;"')\]\s])/g, (match, url) => {
-        return `<a class="editor-link" href="${url}" target="_blank" rel="noopener noreferrer" contenteditable="false" title="Abrir: ${url}"><span>${url}</span><svg class="link-ext-icon" viewBox="0 0 24 24" width="10" height="10" stroke="currentColor" stroke-width="2" fill="none"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg></a>`;
       });
 
+    // 2. Tokenizar enlaces para evitar dobles transformaciones o colisiones
+    const linkTokens = [];
+
+    // [label](url)
+    safe = safe.replace(/\[([^\]]+)\]\((https?:\/\/[^\s\)]+)\)/g, (match, label, url) => {
+      const idx = linkTokens.length;
+      const { element } = this.createLinkElement(url, label);
+      linkTokens.push(element.outerHTML);
+      return `___LINK_TOKEN_${idx}___`;
+    });
+
+    // <a ...>...</a> ya existentes
+    safe = safe.replace(/<a\b[^>]*>[\s\S]*?<\/a>/gi, (match) => {
+      const idx = linkTokens.length;
+      linkTokens.push(match);
+      return `___LINK_TOKEN_${idx}___`;
+    });
+
+    // Raw URLs: https://... o http://...
+    const rawUrlRegex = /(https?:\/\/[^\s<>"'\(\)]+)/gi;
+    safe = safe.replace(rawUrlRegex, (rawUrl) => {
+      const { element, trailing } = this.createLinkElement(rawUrl);
+      const idx = linkTokens.length;
+      linkTokens.push(element.outerHTML);
+      return `___LINK_TOKEN_${idx}___` + (trailing || '');
+    });
+
+    // Restaurar tokens de enlace
+    linkTokens.forEach((token, idx) => {
+      safe = safe.replace(`___LINK_TOKEN_${idx}___`, token);
+    });
+
+    // Restaurar spans de color
     colorPlaceholders.forEach((item, idx) => {
       safe = safe.replace(`___COLOR_TOKEN_${idx}___`, `<span style="color: ${item.color}">${this.inlineMarkdownToHTML(item.inner)}</span>`);
     });
@@ -2244,21 +2387,14 @@ Escribe libremente aquí tu primer apunte o pensamiento.`
           // Transformación instantánea de URL a enlace interactivo al pulsar espacio
           const urlMatch = textBefore.match(/(https?:\/\/[^\s]+)$/);
           if (urlMatch) {
+            e.preventDefault();
             const fullUrl = urlMatch[1];
+            const { element: linkElem, trailing } = this.createLinkElement(fullUrl);
             const startIdx = textBefore.lastIndexOf(fullUrl);
             const beforeUrl = textBefore.slice(0, startIdx);
             const afterCursor = node.textContent.slice(range.startOffset);
 
-            const linkElem = document.createElement('a');
-            linkElem.className = 'editor-link';
-            linkElem.href = fullUrl;
-            linkElem.target = '_blank';
-            linkElem.rel = 'noopener noreferrer';
-            linkElem.contentEditable = 'false';
-            linkElem.title = `Abrir: ${fullUrl}`;
-            linkElem.innerHTML = `<span>${fullUrl}</span><svg class="link-ext-icon" viewBox="0 0 24 24" width="10" height="10" stroke="currentColor" stroke-width="2" fill="none"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>`;
-
-            const spaceNode = document.createTextNode('\u00A0');
+            const spaceNode = document.createTextNode((trailing || '') + '\u00A0');
             const parent = node.parentNode;
 
             const frag = document.createDocumentFragment();
@@ -2354,11 +2490,63 @@ Escribe libremente aquí tu primer apunte o pensamiento.`
         }
       }
 
-      // 2. Al presionar Enter dentro de un Encabezado (h1, h2, h3), crear un párrafo nuevo normal
+      // 2. Al presionar Enter: autolink si termina en URL, o salto de párrafo en encabezados
       if (e.key === 'Enter' && !e.shiftKey) {
         const sel = window.getSelection();
         if (sel && sel.rangeCount > 0) {
           const range = sel.getRangeAt(0);
+          const node = range.startContainer;
+
+          // Autolink de URL al presionar Enter al final de una dirección web
+          if (node && node.nodeType === Node.TEXT_NODE) {
+            const textBefore = node.textContent.slice(0, range.startOffset);
+            const urlMatch = textBefore.match(/(https?:\/\/[^\s]+)$/);
+            if (urlMatch) {
+              e.preventDefault();
+              const fullUrl = urlMatch[1];
+              const { element: linkElem, trailing } = this.createLinkElement(fullUrl);
+              const startIdx = textBefore.lastIndexOf(fullUrl);
+              const beforeUrl = textBefore.slice(0, startIdx);
+              const afterCursor = node.textContent.slice(range.startOffset);
+
+              const parent = node.parentNode;
+              const frag = document.createDocumentFragment();
+              if (beforeUrl) frag.appendChild(document.createTextNode(beforeUrl));
+              frag.appendChild(linkElem);
+              if (trailing) frag.appendChild(document.createTextNode(trailing));
+
+              let block = parent;
+              while (block && block !== this.dom.editorBody && !['P', 'DIV', 'H1', 'H2', 'H3'].includes(block.tagName)) {
+                block = block.parentNode;
+              }
+
+              parent.replaceChild(frag, node);
+
+              const nextP = document.createElement('p');
+              if (afterCursor.trim()) {
+                nextP.textContent = afterCursor;
+              } else {
+                nextP.innerHTML = '<br>';
+              }
+
+              if (block && block.parentNode === this.dom.editorBody) {
+                block.parentNode.insertBefore(nextP, block.nextSibling);
+              } else {
+                this.dom.editorBody.appendChild(nextP);
+              }
+
+              const newRange = document.createRange();
+              newRange.setStart(nextP, 0);
+              newRange.collapse(true);
+              sel.removeAllRanges();
+              sel.addRange(newRange);
+
+              this.onNoteChanged();
+              this.updateTelemetry();
+              return;
+            }
+          }
+
           let block = range.startContainer;
           while (block && block !== this.dom.editorBody && !['H1', 'H2', 'H3'].includes(block.tagName)) {
             block = block.parentNode;
@@ -2379,6 +2567,10 @@ Escribe libremente aquí tu primer apunte o pensamiento.`
           }
         }
       }
+    });
+
+    this.dom.editorBody.addEventListener('blur', () => {
+      this.autolinkEditorBody();
     });
 
     this.dom.editorBody.addEventListener('input', () => {
@@ -2470,14 +2662,28 @@ Escribe libremente aquí tu primer apunte o pensamiento.`
       return `<a class="wiki-link" data-title="${cleanTitle}" title="Vincular con: ${cleanTitle}"><svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg><span>${cleanTitle}</span></a>`;
     });
 
-    // Enlaces Markdown [texto](url) y URLs directas
-    html = html
-      .replace(/\[([^\]]+)\]\((https?:\/\/[^\s\)]+)\)/g, (match, label, url) => {
-        return `<a class="editor-link" href="${url}" target="_blank" rel="noopener noreferrer" title="Abrir: ${url}"><span>${label}</span><svg class="link-ext-icon" viewBox="0 0 24 24" width="10" height="10" stroke="currentColor" stroke-width="2" fill="none"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg></a>`;
-      })
-      .replace(/(?<!href=["'])(https?:\/\/[^\s<]+[^<.,:;"')\]\s])/g, (match, url) => {
-        return `<a class="editor-link" href="${url}" target="_blank" rel="noopener noreferrer" title="Abrir: ${url}"><span>${url}</span><svg class="link-ext-icon" viewBox="0 0 24 24" width="10" height="10" stroke="currentColor" stroke-width="2" fill="none"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg></a>`;
-      });
+    // Enlaces Markdown [texto](url) y URLs directas sin colisiones
+    const previewTokens = [];
+    html = html.replace(/\[([^\]]+)\]\((https?:\/\/[^\s\)]+)\)/g, (match, label, url) => {
+      const idx = previewTokens.length;
+      const { element } = this.createLinkElement(url, label);
+      previewTokens.push(element.outerHTML);
+      return `___PREV_LINK_${idx}___`;
+    });
+    html = html.replace(/<a\b[^>]*>[\s\S]*?<\/a>/gi, (match) => {
+      const idx = previewTokens.length;
+      previewTokens.push(match);
+      return `___PREV_LINK_${idx}___`;
+    });
+    html = html.replace(/(https?:\/\/[^\s<>"'\(\)]+)/gi, (rawUrl) => {
+      const { element, trailing } = this.createLinkElement(rawUrl);
+      const idx = previewTokens.length;
+      previewTokens.push(element.outerHTML);
+      return `___PREV_LINK_${idx}___` + (trailing || '');
+    });
+    previewTokens.forEach((token, idx) => {
+      html = html.replace(`___PREV_LINK_${idx}___`, token);
+    });
 
     // Párrafos
     html = html.split('\n\n').map(p => {

@@ -2738,6 +2738,15 @@ body.zen-mode .zen-exit-pill {
   vertical-align: middle;
 }
 
+.editor-link * {
+  cursor: pointer !important;
+  pointer-events: none;
+}
+
+.editor-link:active {
+  transform: translateY(1px);
+}
+
 /* ==========================================================================
    Google Authentication & User Account Profile
    ========================================================================== */

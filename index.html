@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Memora — Pensamiento Editorial, Segundo Cerebro & Cloud Sync</title>
   <meta name="description" content="Espacio de notas y segundo cerebro con diseño editorial inspirado en Craft, Bear, Supernotes y Capacities, con sincronización en tiempo real en Firebase.">
-  <link rel="stylesheet" href="css/style.css?v=3.0.0">
+  <link rel="stylesheet" href="css/style.css?v=3.1.0">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23d97706'><path d='M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z'/></svg>">
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#0c0d10">
@@ -727,13 +727,13 @@
   </div>
 
   <!-- JavaScript Module Entry -->
-  <script type="module" src="js/app.js?v=3.0.0"></script>
+  <script type="module" src="js/app.js?v=3.1.0"></script>
 
   <!-- PWA Service Worker Registration -->
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js?v=3.0.0').catch((err) => {
+        navigator.serviceWorker.register('/sw.js?v=3.1.0').catch((err) => {
           console.warn('PWA Service Worker registration skipped:', err);
         });
       });
