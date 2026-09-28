@@ -5,9 +5,11 @@
 
 import { haptics } from './audio.js';
 import { NotesGraph } from './graph.js';
-import { CommandPalette } from './commands.js?v=2.9.0';
-import { firebaseSync } from './firebase.js?v=2.9.0';
+import { CommandPalette } from './commands.js?v=3.0.0';
+import { firebaseSync, DEFAULT_WORKSPACE_ID } from './firebase.js?v=3.0.0';
 
+const SESSION_HINT_KEY = 'memora_session_hint_uid';
+const LEGACY_SESSION_HINT_KEY = 'memora_session_user_id';
 const STORAGE_KEY = 'memora_data_v1';
 const LEGACY_STORAGE_KEY = 'auranotes_data_v2';
 const THEME_KEY = 'memora_theme';
@@ -133,12 +135,27 @@ export class MemoraApp {
     this.wikiMenuOpen = false;
     this.wikiMenuSelectedIndex = 0;
 
+    // Concurrency control, sync sequence tokens & subscriptions
+    this.syncAbortController = null;
+    this.syncRequestId = 0;
+    this.realtimeUnsubscribe = null;
+    this.hasCompletedInitialSync = false;
+
     this.init();
   }
 
   async init() {
     this.loadTheme();
     this.loadFontSize();
+
+    // Frame-0 Hydration via Session Hint:
+    // If a session hint exists, provisionally set currentUser so getStorageKey scopes
+    // to the authenticated user's cache, rendering user notes immediately without flickering welcome templates.
+    const sessionUid = localStorage.getItem(SESSION_HINT_KEY) || localStorage.getItem(LEGACY_SESSION_HINT_KEY);
+    if (sessionUid) {
+      this.currentUser = { uid: sessionUid };
+    }
+
     this.loadLocalNotes();
     this.bindDOM();
     this.initModules();
@@ -158,22 +175,40 @@ export class MemoraApp {
     this.setupWikiLinks();
     this.setupLiveMarkdownShortcuts();
 
-    // Iniciar conexión y sincronización con Firebase
-    this.initCloudSync();
+    // Iniciar conexión y sincronización determinista con Firebase y Supabase
+    await this.initCloudSync();
   }
 
-  initCloudSync() {
+  async initCloudSync() {
     firebaseSync.onStatusChange((status, text) => {
       this.updateSyncBadge(status, text);
     });
 
+    // 1. Espera determinista a que Firebase Auth resuelva la sesión desde IndexedDB
+    // NUNCA disparar cargas de invitado (default_workspace) mientras se restaura la sesión existente
+    const initialUser = await firebaseSync.waitForAuthReady();
+    await this.handleAuthState(initialUser);
+
+    // 2. Escuchar cambios de estado posteriores (inicio de sesión / cierre de sesión)
     firebaseSync.onAuthStateChange(async (user) => {
+      const currentUid = this.currentUser?.uid || null;
+      const newUid = user?.uid || null;
+      if (this.hasCompletedInitialSync && currentUid === newUid) {
+        return;
+      }
       await this.handleAuthState(user);
     });
   }
 
   async handleAuthState(user) {
-    this.currentUser = user;
+    this.currentUser = user || null;
+    if (user && user.uid) {
+      localStorage.setItem(SESSION_HINT_KEY, user.uid);
+      localStorage.setItem(LEGACY_SESSION_HINT_KEY, user.uid);
+    } else {
+      localStorage.removeItem(SESSION_HINT_KEY);
+      localStorage.removeItem(LEGACY_SESSION_HINT_KEY);
+    }
     this.updateAuthUI(user);
     await this.syncUserData(user);
   }
@@ -254,39 +289,104 @@ Escribe libremente aquí tu primer apunte o pensamiento.`
     ];
   }
 
+  getActiveWorkspaceId() {
+    if (this.currentUser && this.currentUser.uid) {
+      return this.currentUser.uid;
+    }
+    return DEFAULT_WORKSPACE_ID;
+  }
+
   async syncUserData(user) {
-    // 1. Cargar notas desde Cloud Firestore (espacio privado del usuario Google o espacio cloud por defecto)
-    const remoteNotes = await firebaseSync.loadNotes();
-    if (remoteNotes && remoteNotes.length > 0) {
-      remoteNotes.sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0));
-      this.notes = remoteNotes;
-    } else {
-      // Si la colección remota aún está vacía, recuperar del caché local correspondiente o inicializar semilla
-      const localKey = this.getStorageKey();
-      const localSaved = localStorage.getItem(localKey);
-      if (localSaved) {
-        try {
-          this.notes = JSON.parse(localSaved);
-        } catch (e) {
-          this.notes = user ? this.createStarterUserNotes(user) : SEED_NOTES;
-        }
-      } else {
-        this.notes = user ? this.createStarterUserNotes(user) : SEED_NOTES;
-      }
-      await firebaseSync.uploadNotesBatch(this.notes);
+    // 1. Abort any in-flight sync operation
+    if (this.syncAbortController) {
+      this.syncAbortController.abort();
+    }
+    this.syncAbortController = new AbortController();
+    const signal = this.syncAbortController.signal;
+
+    // 2. Monotonic sequence token / Request ID
+    this.syncRequestId = (this.syncRequestId || 0) + 1;
+    const currentReqId = this.syncRequestId;
+
+    const targetWorkspace = user?.uid || DEFAULT_WORKSPACE_ID;
+
+    // 3. Cargar notas desde Supabase con workspaceId explícito y AbortSignal
+    const remoteNotes = await firebaseSync.loadNotes(targetWorkspace, signal);
+
+    // Stale Response Discard Verification:
+    // If another sync started or user changed or signal was aborted, discard immediately!
+    if (this.syncRequestId !== currentReqId || signal.aborted) {
+      console.log(`[Sync] Stale sync response discarded (reqId: ${currentReqId}, current: ${this.syncRequestId})`);
+      return;
+    }
+    const expectedUid = user?.uid || null;
+    const currentUid = this.currentUser?.uid || null;
+    if (expectedUid !== currentUid) {
+      console.log(`[Sync] User mismatch discarded (expected ${expectedUid}, current ${currentUid})`);
+      return;
     }
 
-    this.saveLocalNotes();
+    // 4. Cache Guardrails & Template Upload Protection:
+    // If remoteNotes is null (network failure) or aborted, do NOT create starter notes or call uploadNotesBatch!
+    if (remoteNotes === null || remoteNotes?.aborted) {
+      console.warn('[Sync] Remote load failed or aborted. Preserving existing local state without overwriting.');
+      return;
+    }
+
+    if (Array.isArray(remoteNotes)) {
+      if (remoteNotes.length > 0) {
+        remoteNotes.sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0));
+        this.notes = remoteNotes;
+      } else {
+        // Only if remote collection is legitimately empty (length === 0):
+        const localKey = this.getStorageKey(targetWorkspace);
+        const localSaved = localStorage.getItem(localKey);
+        let foundLocal = false;
+        if (localSaved) {
+          try {
+            const parsed = JSON.parse(localSaved);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              this.notes = parsed;
+              foundLocal = true;
+            }
+          } catch (e) {}
+        }
+        if (!foundLocal) {
+          this.notes = user ? this.createStarterUserNotes(user) : SEED_NOTES;
+        }
+        // Upload starter notes strictly to targetWorkspace
+        await firebaseSync.uploadNotesBatch(this.notes, targetWorkspace, signal);
+
+        // Verification after upload
+        if (this.syncRequestId !== currentReqId || signal.aborted) {
+          return;
+        }
+      }
+    }
+
+    this.saveLocalNotes(targetWorkspace);
     this.renderNoteList();
     const activeNotes = this.getActiveNotes();
     if (activeNotes.length > 0) {
       const keepCurrent = activeNotes.find(n => n.id === this.activeNoteId);
       this.selectNote(keepCurrent ? keepCurrent.id : activeNotes[0].id, false);
     }
+    if (this.currentView === 'broadsheet') this.renderBroadsheet();
+    if (this.currentView === 'graph' && this.graph) this.graph.setData(this.getActiveNotes());
+    this.hasCompletedInitialSync = true;
 
-    // 2. Escuchar cambios en vivo desde Cloud Firestore
-    firebaseSync.listenLiveUpdates((updatedNotes) => {
-      if (updatedNotes && updatedNotes.length > 0) {
+    // 5. Escuchar cambios en vivo desde Supabase estrictamente para targetWorkspace
+    if (this.realtimeUnsubscribe) {
+      this.realtimeUnsubscribe();
+      this.realtimeUnsubscribe = null;
+    }
+    this.realtimeUnsubscribe = firebaseSync.listenLiveUpdates(targetWorkspace, (updatedNotes) => {
+      // Discard live updates if sync sequence or workspace drifted
+      if (this.syncRequestId !== currentReqId) return;
+      const activeWs = this.currentUser?.uid || DEFAULT_WORKSPACE_ID;
+      if (activeWs !== targetWorkspace) return;
+
+      if (Array.isArray(updatedNotes) && updatedNotes.length > 0) {
         const isTyping =
           document.activeElement === this.dom.titleInput ||
           document.activeElement === this.dom.editorBody ||
@@ -307,7 +407,7 @@ Escribe libremente aquí tu primer apunte o pensamiento.`
         }
 
         this.notes = updatedNotes;
-        this.saveLocalNotes();
+        this.saveLocalNotes(targetWorkspace);
         this.renderNoteList();
         if (!isTyping && this.activeNoteId) {
           const active = this.notes.find(n => n.id === this.activeNoteId && !n.isDeleted);
@@ -325,6 +425,10 @@ Escribe libremente aquí tu primer apunte o pensamiento.`
     try {
       this.showToast('Iniciando sesión con Google...');
       const user = await firebaseSync.signInWithGoogle();
+      if (user && user.uid) {
+        localStorage.setItem(SESSION_HINT_KEY, user.uid);
+        localStorage.setItem(LEGACY_SESSION_HINT_KEY, user.uid);
+      }
       this.showToast(`¡Sesión iniciada como ${user.displayName || 'Usuario'}!`);
     } catch (err) {
       console.warn('Google sign-in error:', err);
@@ -340,9 +444,23 @@ Escribe libremente aquí tu primer apunte o pensamiento.`
 
   async handleSignOut() {
     try {
+      localStorage.removeItem(SESSION_HINT_KEY);
+      localStorage.removeItem(LEGACY_SESSION_HINT_KEY);
+      if (this.syncAbortController) {
+        this.syncAbortController.abort();
+      }
+      if (this.realtimeUnsubscribe) {
+        this.realtimeUnsubscribe();
+        this.realtimeUnsubscribe = null;
+      }
       await firebaseSync.signOutUser();
       this.currentUser = null;
       this.updateAuthUI(null);
+      this.loadLocalNotes(DEFAULT_WORKSPACE_ID);
+      this.renderNoteList();
+      if (this.notes.length > 0) {
+        this.selectNote(this.notes[0].id, false);
+      }
       await this.syncUserData(null);
       this.showToast('Has cerrado sesión en Google.');
     } catch (err) {
@@ -352,8 +470,9 @@ Escribe libremente aquí tu primer apunte o pensamiento.`
 
   async handleForceSyncCloud() {
     this.showToast('Sincronizando notas con la base de datos en la nube...');
+    const ws = this.getActiveWorkspaceId();
     await firebaseSync.flushPendingSaves();
-    await firebaseSync.uploadNotesBatch(this.notes);
+    await firebaseSync.uploadNotesBatch(this.notes, ws);
     this.showToast('Base de datos sincronizada permanentemente.');
   }
 
@@ -403,35 +522,36 @@ Escribe libremente aquí tu primer apunte o pensamiento.`
     if (notify) this.showToast(`Tamaño de fuente: ${size}`);
   }
 
-  getStorageKey() {
-    if (this.currentUser && this.currentUser.uid) {
-      return `memora_user_${this.currentUser.uid}_notes`;
+  getStorageKey(workspaceId = null) {
+    const ws = workspaceId || (this.currentUser && this.currentUser.uid);
+    if (ws && ws !== DEFAULT_WORKSPACE_ID) {
+      return `memora_user_${ws}_notes`;
     }
     return 'memora_guest_notes';
   }
 
-  loadLocalNotes() {
+  loadLocalNotes(workspaceId = null) {
     try {
-      const key = this.getStorageKey();
+      const key = this.getStorageKey(workspaceId);
       const data = localStorage.getItem(key);
       if (data) {
         this.notes = JSON.parse(data);
       } else {
-        if (this.currentUser) {
+        if (this.currentUser && this.currentUser.uid) {
           this.notes = this.createStarterUserNotes(this.currentUser);
         } else {
           this.notes = SEED_NOTES;
         }
       }
     } catch (e) {
-      this.notes = this.currentUser ? this.createStarterUserNotes(this.currentUser) : SEED_NOTES;
+      this.notes = (this.currentUser && this.currentUser.uid) ? this.createStarterUserNotes(this.currentUser) : SEED_NOTES;
     }
     this.notes.sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0));
   }
 
-  saveLocalNotes() {
+  saveLocalNotes(workspaceId = null) {
     try {
-      const key = this.getStorageKey();
+      const key = this.getStorageKey(workspaceId);
       localStorage.setItem(key, JSON.stringify(this.notes));
     } catch (e) {}
   }
@@ -555,6 +675,25 @@ Escribe libremente aquí tu primer apunte o pensamiento.`
     this.dom.editorBody.addEventListener('input', () => {
       this.onNoteChanged();
       this.updateTelemetry();
+    });
+
+    // Clic en enlaces web para abrirlos directamente en una nueva pestaña
+    this.dom.editorBody.addEventListener('click', (e) => {
+      const link = e.target.closest('a.editor-link, a[href^="http"]');
+      if (link && link.href) {
+        e.preventDefault();
+        e.stopPropagation();
+        window.open(link.href, '_blank', 'noopener,noreferrer');
+      }
+    });
+
+    this.dom.renderedPreview?.addEventListener('click', (e) => {
+      const link = e.target.closest('a.editor-link, a[href^="http"]');
+      if (link && link.href) {
+        e.preventDefault();
+        e.stopPropagation();
+        window.open(link.href, '_blank', 'noopener,noreferrer');
+      }
     });
 
     // Soporte para pegar imágenes directamente (Ctrl+V)
@@ -955,7 +1094,7 @@ Escribe libremente aquí tu primer apunte o pensamiento.`
     };
     this.notes.unshift(newNote);
     this.saveLocalNotes();
-    firebaseSync.saveNote(newNote);
+    firebaseSync.saveNote(newNote, this.getActiveWorkspaceId());
     this.renderNoteList();
     this.selectNote(newNote.id);
     this.dom.titleInput.focus();
@@ -1042,7 +1181,7 @@ Escribe libremente aquí tu primer apunte o pensamiento.`
     note.updatedAt = new Date().toISOString();
 
     this.saveLocalNotes();
-    firebaseSync.saveNoteLive(note);
+    firebaseSync.saveNoteLive(note, this.getActiveWorkspaceId());
     this.updateSidebarCard(note);
     this.renderRenderedPreview(note.content);
 
@@ -1251,6 +1390,38 @@ Escribe libremente aquí tu primer apunte o pensamiento.`
     if (pastedText && (pastedText.includes('data:image/') || /!\[.*?\]\(.*?\)/.test(pastedText))) {
       e.preventDefault();
       this.insertMarkdownFragment(pastedText);
+      return;
+    }
+
+    // Soporte para pegar URLs como enlaces interactivos o vincular texto seleccionado
+    if (pastedText && /^https?:\/\/[^\s]+$/.test(pastedText.trim())) {
+      const url = pastedText.trim();
+      const sel = window.getSelection();
+      if (sel && sel.rangeCount > 0 && this.dom.editorBody.contains(sel.getRangeAt(0).commonAncestorContainer)) {
+        e.preventDefault();
+        const range = sel.getRangeAt(0);
+        const selectedText = !sel.isCollapsed ? sel.toString().trim() : url;
+        const linkElem = document.createElement('a');
+        linkElem.className = 'editor-link';
+        linkElem.href = url;
+        linkElem.target = '_blank';
+        linkElem.rel = 'noopener noreferrer';
+        linkElem.contentEditable = 'false';
+        linkElem.title = `Abrir: ${url}`;
+        linkElem.innerHTML = `<span>${this.escapeHtml(selectedText)}</span><svg class="link-ext-icon" viewBox="0 0 24 24" width="10" height="10" stroke="currentColor" stroke-width="2" fill="none"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>`;
+
+        const space = document.createTextNode('\u00A0');
+        range.deleteContents();
+        range.insertNode(space);
+        range.insertNode(linkElem);
+        range.setStartAfter(space);
+        range.collapse(true);
+        sel.removeAllRanges();
+        sel.addRange(range);
+        this.onNoteChanged();
+        this.updateTelemetry();
+        return;
+      }
     }
   }
 
@@ -1478,6 +1649,12 @@ Escribe libremente aquí tu primer apunte o pensamiento.`
       .replace(/\[\[(.*?)\]\]/g, (match, title) => {
         const clean = title.trim();
         return `<a class="wiki-link" data-title="${clean}" contenteditable="false"><svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg><span>${clean}</span></a>`;
+      })
+      .replace(/\[([^\]]+)\]\((https?:\/\/[^\s\)]+)\)/g, (match, label, url) => {
+        return `<a class="editor-link" href="${url}" target="_blank" rel="noopener noreferrer" contenteditable="false" title="Abrir: ${url}"><span>${label}</span><svg class="link-ext-icon" viewBox="0 0 24 24" width="10" height="10" stroke="currentColor" stroke-width="2" fill="none"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg></a>`;
+      })
+      .replace(/(?<!href=["'])(https?:\/\/[^\s<]+[^<.,:;"')\]\s])/g, (match, url) => {
+        return `<a class="editor-link" href="${url}" target="_blank" rel="noopener noreferrer" contenteditable="false" title="Abrir: ${url}"><span>${url}</span><svg class="link-ext-icon" viewBox="0 0 24 24" width="10" height="10" stroke="currentColor" stroke-width="2" fill="none"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg></a>`;
       });
 
     colorPlaceholders.forEach((item, idx) => {
@@ -1538,6 +1715,25 @@ Escribe libremente aquí tu primer apunte o pensamiento.`
           output += `<span style="color: ${col}">`;
           node.childNodes.forEach(walk);
           output += `</span>`;
+          return;
+        }
+
+        if (tag === 'a') {
+          if (node.classList && node.classList.contains('wiki-link')) {
+            const title = node.getAttribute('data-title') || node.textContent.trim();
+            output += `[[${title}]]`;
+            return;
+          }
+          const href = node.getAttribute('href') || '';
+          const textSpan = node.querySelector('span');
+          const text = textSpan ? textSpan.textContent.trim() : node.textContent.trim();
+          if (!href) {
+            output += text;
+          } else if (text === href) {
+            output += href;
+          } else {
+            output += `[${text}](${href})`;
+          }
           return;
         }
 
@@ -2045,6 +2241,45 @@ Escribe libremente aquí tu primer apunte o pensamiento.`
             return;
           }
 
+          // Transformación instantánea de URL a enlace interactivo al pulsar espacio
+          const urlMatch = textBefore.match(/(https?:\/\/[^\s]+)$/);
+          if (urlMatch) {
+            const fullUrl = urlMatch[1];
+            const startIdx = textBefore.lastIndexOf(fullUrl);
+            const beforeUrl = textBefore.slice(0, startIdx);
+            const afterCursor = node.textContent.slice(range.startOffset);
+
+            const linkElem = document.createElement('a');
+            linkElem.className = 'editor-link';
+            linkElem.href = fullUrl;
+            linkElem.target = '_blank';
+            linkElem.rel = 'noopener noreferrer';
+            linkElem.contentEditable = 'false';
+            linkElem.title = `Abrir: ${fullUrl}`;
+            linkElem.innerHTML = `<span>${fullUrl}</span><svg class="link-ext-icon" viewBox="0 0 24 24" width="10" height="10" stroke="currentColor" stroke-width="2" fill="none"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>`;
+
+            const spaceNode = document.createTextNode('\u00A0');
+            const parent = node.parentNode;
+
+            const frag = document.createDocumentFragment();
+            if (beforeUrl) frag.appendChild(document.createTextNode(beforeUrl));
+            frag.appendChild(linkElem);
+            frag.appendChild(spaceNode);
+            if (afterCursor) frag.appendChild(document.createTextNode(afterCursor));
+
+            parent.replaceChild(frag, node);
+
+            const newRange = document.createRange();
+            newRange.setStartAfter(spaceNode);
+            newRange.collapse(true);
+            sel.removeAllRanges();
+            sel.addRange(newRange);
+
+            this.onNoteChanged();
+            this.updateTelemetry();
+            return;
+          }
+
           // Callouts / Citas: > + espacio
           if (trimmed === '>') {
             e.preventDefault();
@@ -2235,6 +2470,15 @@ Escribe libremente aquí tu primer apunte o pensamiento.`
       return `<a class="wiki-link" data-title="${cleanTitle}" title="Vincular con: ${cleanTitle}"><svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg><span>${cleanTitle}</span></a>`;
     });
 
+    // Enlaces Markdown [texto](url) y URLs directas
+    html = html
+      .replace(/\[([^\]]+)\]\((https?:\/\/[^\s\)]+)\)/g, (match, label, url) => {
+        return `<a class="editor-link" href="${url}" target="_blank" rel="noopener noreferrer" title="Abrir: ${url}"><span>${label}</span><svg class="link-ext-icon" viewBox="0 0 24 24" width="10" height="10" stroke="currentColor" stroke-width="2" fill="none"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg></a>`;
+      })
+      .replace(/(?<!href=["'])(https?:\/\/[^\s<]+[^<.,:;"')\]\s])/g, (match, url) => {
+        return `<a class="editor-link" href="${url}" target="_blank" rel="noopener noreferrer" title="Abrir: ${url}"><span>${url}</span><svg class="link-ext-icon" viewBox="0 0 24 24" width="10" height="10" stroke="currentColor" stroke-width="2" fill="none"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg></a>`;
+      });
+
     // Párrafos
     html = html.split('\n\n').map(p => {
       if (p.trim().startsWith('<h') || p.trim().startsWith('<div') || p.trim().startsWith('<pre') || p.trim().startsWith('<img')) {
@@ -2280,7 +2524,7 @@ Escribe libremente aquí tu primer apunte o pensamiento.`
         };
         this.notes.unshift(newNote);
         this.saveLocalNotes();
-        firebaseSync.saveNoteLive(newNote);
+        firebaseSync.saveNoteLive(newNote, this.getActiveWorkspaceId());
         this.renderNoteList();
         this.selectNote(newNote.id);
         this.switchView('editor');
@@ -2417,7 +2661,7 @@ Escribe libremente aquí tu primer apunte o pensamiento.`
     note.isPinned = false;
 
     this.saveLocalNotes();
-    firebaseSync.saveNote(note);
+    firebaseSync.saveNote(note, this.getActiveWorkspaceId());
 
     this.updateTrashBadge();
     this.renderNoteList();
@@ -2446,7 +2690,7 @@ Escribe libremente aquí tu primer apunte o pensamiento.`
     note.updatedAt = new Date().toISOString();
 
     this.saveLocalNotes();
-    firebaseSync.saveNote(note);
+    firebaseSync.saveNote(note, this.getActiveWorkspaceId());
 
     this.updateTrashBadge();
     this.renderNoteList();
@@ -2462,7 +2706,7 @@ Escribe libremente aquí tu primer apunte o pensamiento.`
     if (confirm('¿Eliminar este apunte definitivamente? No se podrá recuperar.')) {
       this.notes = this.notes.filter(n => n.id !== noteId);
       this.saveLocalNotes();
-      firebaseSync.deleteNote(noteId);
+      firebaseSync.deleteNote(noteId, this.getActiveWorkspaceId());
       this.renderTrashList();
       this.showToast('Apunte eliminado definitivamente');
     }
@@ -2473,8 +2717,9 @@ Escribe libremente aquí tu primer apunte o pensamiento.`
     if (deleted.length === 0) return;
 
     if (confirm(`¿Vaciar la papelera? Se eliminarán definitivamente ${deleted.length} apunte(s).`)) {
+      const ws = this.getActiveWorkspaceId();
       deleted.forEach(n => {
-        firebaseSync.deleteNote(n.id);
+        firebaseSync.deleteNote(n.id, ws);
       });
       this.notes = this.notes.filter(n => !n.isDeleted);
       this.saveLocalNotes();
@@ -2721,7 +2966,7 @@ Escribe libremente aquí tu primer apunte o pensamiento.`
     }
 
     this.saveLocalNotes();
-    firebaseSync.saveNote(note);
+    firebaseSync.saveNote(note, this.getActiveWorkspaceId());
     this.renderNoteList();
 
     if (this.activeNoteId === id) {
@@ -2756,7 +3001,7 @@ Escribe libremente aquí tu primer apunte o pensamiento.`
     };
     this.notes.unshift(dup);
     this.saveLocalNotes();
-    firebaseSync.saveNote(dup);
+    firebaseSync.saveNote(dup, this.getActiveWorkspaceId());
     this.renderNoteList();
     this.selectNote(dup.id);
     if (this.currentView === 'broadsheet') this.renderBroadsheet();

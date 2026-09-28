@@ -2,7 +2,7 @@
  * Memora - Service Worker PWA (Offline & Standalone Desktop/Mobile Support)
  */
 
-const CACHE_NAME = 'memora-cache-v2.9.0';
+const CACHE_NAME = 'memora-cache-v3.0.0';
 const STATIC_ASSETS = [
   '/',
   '/index.html',

@@ -2708,6 +2708,36 @@ body.zen-mode .zen-exit-pill {
   color: var(--accent);
 }
 
+/* Clickable URL & Markdown Links in Editor and Preview */
+.editor-link {
+  color: var(--accent);
+  text-decoration: underline;
+  text-decoration-color: rgba(217, 119, 6, 0.45);
+  text-underline-offset: 3px;
+  cursor: pointer !important;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  word-break: break-all;
+  padding: 1px 4px;
+  border-radius: 4px;
+  font-weight: 500;
+  transition: all var(--duration-fast) var(--ease-out);
+}
+
+.editor-link:hover {
+  color: var(--accent-hover, #f59e0b);
+  text-decoration-color: currentColor;
+  background: rgba(217, 119, 6, 0.12);
+  box-shadow: 0 0 8px var(--accent-glow);
+}
+
+.editor-link .link-ext-icon {
+  opacity: 0.7;
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+
 /* ==========================================================================
    Google Authentication & User Account Profile
    ========================================================================== */

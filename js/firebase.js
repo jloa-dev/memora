@@ -17,7 +17,7 @@ import {
 export const SUPABASE_URL = "https://rzdzsvbthtvashksixzk.supabase.co";
 export const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ6ZHpzdmJ0aHR2YXNoa3NpeHprIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgzMTIxMTgsImV4cCI6MjEwMzg4ODExOH0.P-KuXsAGR5LftgUhuz-zEHDed0BSWX1N7zcv_lQ3cfw";
 const TABLE_NAME = "memora_notes";
-const DEFAULT_WORKSPACE_ID = "default_workspace";
+export const DEFAULT_WORKSPACE_ID = "default_workspace";
 
 export const firebaseConfig = {
   apiKey: "AIzaSyAS6PUqQRVvwrYaaVvzOGBgxgUlyFLIbCI",
@@ -33,7 +33,11 @@ class SupabaseCloudSyncManager {
     this.supabase = null;
     this.app = null;
     this.auth = null;
-    this.currentUser = null;
+    this.currentUser = undefined; // undefined = pendiente de resolución, null = invitado, User = autenticado
+    this.authResolved = false;
+    this.authReadyPromise = new Promise((resolve) => {
+      this._resolveAuthReady = resolve;
+    });
     this.isConnected = false;
     this.syncStatusCallback = null;
     this.authStatusCallback = null;
@@ -73,6 +77,11 @@ class SupabaseCloudSyncManager {
       // 4. Escuchar estado de cuenta Google
       onAuthStateChanged(this.auth, (user) => {
         this.currentUser = user || null;
+        this.authResolved = true;
+        if (this._resolveAuthReady) {
+          this._resolveAuthReady(this.currentUser);
+          this._resolveAuthReady = null;
+        }
         if (user) {
           this.updateStatus('synced', `Supabase: ${user.displayName || user.email}`);
         } else {
@@ -83,9 +92,22 @@ class SupabaseCloudSyncManager {
         }
       });
     } catch (e) {
-      console.warn('Error inicializando Supabase Cloud:', e);
+      console.warn('Error inicializando Supabase Cloud / Firebase Auth:', e);
       this.isConnected = true; // REST API sigue disponible vía fetch directo
+      this.authResolved = true;
+      this.currentUser = null;
+      if (this._resolveAuthReady) {
+        this._resolveAuthReady(null);
+        this._resolveAuthReady = null;
+      }
     }
+  }
+
+  waitForAuthReady() {
+    if (this.authResolved) {
+      return Promise.resolve(this.currentUser);
+    }
+    return this.authReadyPromise;
   }
 
   getActiveWorkspaceId() {
@@ -110,7 +132,7 @@ class SupabaseCloudSyncManager {
 
   onAuthStateChange(cb) {
     this.authStatusCallback = cb;
-    if (this.auth && this.currentUser !== undefined && cb) {
+    if (this.authResolved && cb) {
       cb(this.currentUser);
     }
   }
@@ -156,7 +178,8 @@ class SupabaseCloudSyncManager {
     this.updateStatus('synced', 'Supabase: Conectado');
   }
 
-  toDbRow(note) {
+  toDbRow(note, workspaceId = null) {
+    const targetWorkspace = workspaceId || this.getActiveWorkspaceId();
     let cleanTitle = (note.title || '').trim();
     if (!cleanTitle && note.content) {
       const firstLine = note.content
@@ -168,9 +191,9 @@ class SupabaseCloudSyncManager {
       }
     }
     return {
-      workspace_id: this.getActiveWorkspaceId(),
+      workspace_id: targetWorkspace,
       id: String(note.id),
-      user_email: this.currentUser?.email || null,
+      user_email: targetWorkspace === DEFAULT_WORKSPACE_ID ? null : (this.currentUser?.email || null),
       title: cleanTitle || 'Nota sin título',
       title_html: note.titleHtml || cleanTitle || 'Nota sin título',
       title_color: note.titleColor || '',
@@ -205,16 +228,25 @@ class SupabaseCloudSyncManager {
     };
   }
 
-  async loadNotes() {
+  async loadNotes(workspaceId = null, signal = null) {
+    if (workspaceId && typeof workspaceId === 'object' && ('aborted' in workspaceId || (typeof AbortSignal !== 'undefined' && workspaceId instanceof AbortSignal))) {
+      signal = workspaceId;
+      workspaceId = null;
+    }
+    const targetWorkspace = workspaceId || this.getActiveWorkspaceId();
+
     try {
       this.updateStatus('syncing', 'Cargando desde Supabase...');
-      const workspaceId = encodeURIComponent(this.getActiveWorkspaceId());
-      const url = `${SUPABASE_URL}/rest/v1/${TABLE_NAME}?workspace_id=eq.${workspaceId}&order=updated_at.desc`;
-      const res = await fetch(url, {
+      const encodedWs = encodeURIComponent(targetWorkspace);
+      const url = `${SUPABASE_URL}/rest/v1/${TABLE_NAME}?workspace_id=eq.${encodedWs}&order=updated_at.desc`;
+      const fetchOptions = {
         method: 'GET',
         headers: this.getHeaders('return=representation'),
         cache: 'no-store'
-      });
+      };
+      if (signal) fetchOptions.signal = signal;
+
+      const res = await fetch(url, fetchOptions);
 
       if (!res.ok) {
         throw new Error(`Supabase HTTP ${res.status}`);
@@ -225,46 +257,65 @@ class SupabaseCloudSyncManager {
       this.updateStatus('synced', 'Sincronizado en Supabase');
       return notes;
     } catch (e) {
+      if (e.name === 'AbortError' || signal?.aborted) {
+        console.log(`[SupabaseSync] loadNotes abortado para workspace: ${targetWorkspace}`);
+        return { aborted: true };
+      }
       console.warn('Supabase load failed:', e);
       this.updateStatus('offline', 'Modo Local (Offline)');
       return null;
     }
   }
 
-  listenLiveUpdates(onUpdate) {
+  listenLiveUpdates(workspaceIdOrCb = null, onUpdate = null) {
+    let targetWorkspace = null;
+    let callback = onUpdate;
+    if (typeof workspaceIdOrCb === 'function') {
+      callback = workspaceIdOrCb;
+      targetWorkspace = this.getActiveWorkspaceId();
+    } else {
+      targetWorkspace = workspaceIdOrCb || this.getActiveWorkspaceId();
+    }
+
     if (this.realtimeChannel && this.supabase) {
-      this.supabase.removeChannel(this.realtimeChannel);
+      try {
+        this.supabase.removeChannel(this.realtimeChannel);
+      } catch (e) {}
       this.realtimeChannel = null;
     }
-    if (!this.supabase) return () => {};
+    if (!this.supabase || !callback) return () => {};
 
-    const workspaceId = this.getActiveWorkspaceId();
     try {
       this.realtimeChannel = this.supabase
-        .channel(`memora_notes_${workspaceId}`)
+        .channel(`memora_notes_${targetWorkspace}_${Date.now()}`)
         .on(
           'postgres_changes',
           {
             event: '*',
             schema: 'public',
             table: TABLE_NAME,
-            filter: `workspace_id=eq.${workspaceId}`
+            filter: `workspace_id=eq.${targetWorkspace}`
           },
           async () => {
             // Evitar recarga si el cambio fue originado localmente hace menos de 1.2s
             if (Date.now() - this.lastLocalWriteTime < 1200) return;
-            const freshNotes = await this.loadNotes();
-            if (freshNotes) {
-              onUpdate(freshNotes);
+            const freshNotes = await this.loadNotes(targetWorkspace);
+            if (Array.isArray(freshNotes)) {
+              callback(freshNotes);
             }
           }
         )
         .subscribe();
 
+      const activeChan = this.realtimeChannel;
       return () => {
-        if (this.realtimeChannel && this.supabase) {
-          this.supabase.removeChannel(this.realtimeChannel);
-          this.realtimeChannel = null;
+        if (activeChan && this.supabase) {
+          try {
+            this.supabase.removeChannel(activeChan);
+          } catch (e) {}
+          if (this.realtimeChannel === activeChan) {
+            this.realtimeChannel = null;
+          }
         }
       };
     } catch (e) {
@@ -272,8 +323,21 @@ class SupabaseCloudSyncManager {
     }
   }
 
-  async saveNote(note, useKeepalive = false) {
+  async saveNote(note, workspaceId = null, useKeepalive = false, signal = null) {
     if (!note || !note.id) return;
+    if (typeof workspaceId === 'boolean') {
+      useKeepalive = workspaceId;
+      workspaceId = null;
+    }
+    if (workspaceId && typeof workspaceId === 'object' && ('aborted' in workspaceId || (typeof AbortSignal !== 'undefined' && workspaceId instanceof AbortSignal))) {
+      signal = workspaceId;
+      workspaceId = null;
+    }
+    if (typeof useKeepalive === 'object' && useKeepalive && ('aborted' in useKeepalive || (typeof AbortSignal !== 'undefined' && useKeepalive instanceof AbortSignal))) {
+      signal = useKeepalive;
+      useKeepalive = false;
+    }
+    const targetWorkspace = workspaceId || this.getActiveWorkspaceId();
 
     if (this.saveTimeouts.has(note.id)) {
       clearTimeout(this.saveTimeouts.get(note.id));
@@ -284,35 +348,42 @@ class SupabaseCloudSyncManager {
     try {
       this.lastLocalWriteTime = Date.now();
       this.updateStatus('syncing', 'Guardando en Supabase...');
-      const row = this.toDbRow(note);
+      const row = this.toDbRow(note, targetWorkspace);
       const url = `${SUPABASE_URL}/rest/v1/${TABLE_NAME}?on_conflict=workspace_id,id`;
 
       // Si el payload es menor a 60KB podemos activar keepalive para garantizar escritura al cerrar pestaña
       const bodyStr = JSON.stringify([row]);
       const canKeepAlive = useKeepalive && bodyStr.length < 60000;
 
-      const res = await fetch(url, {
+      const fetchOptions = {
         method: 'POST',
         headers: this.getHeaders('resolution=merge-duplicates,return=minimal'),
         body: bodyStr,
         keepalive: canKeepAlive
-      });
+      };
+      if (signal) fetchOptions.signal = signal;
+
+      const res = await fetch(url, fetchOptions);
 
       if (!res.ok) {
         throw new Error(`Supabase save error ${res.status}`);
       }
       this.updateStatus('synced', 'Guardado en Supabase');
+      return { success: true };
     } catch (e) {
+      if (e.name === 'AbortError' || signal?.aborted) return { aborted: true };
       console.warn('Supabase save failed:', e);
       this.updateStatus('offline', 'Guardado localmente');
+      return null;
     }
   }
 
-  saveNoteLive(note) {
+  saveNoteLive(note, workspaceId = null) {
     if (!note || !note.id) return;
+    const targetWorkspace = workspaceId || this.getActiveWorkspaceId();
 
     this.updateStatus('syncing', 'Sincronizando con Supabase...');
-    this.pendingNotes.set(note.id, { ...note });
+    this.pendingNotes.set(note.id, { note: { ...note }, workspaceId: targetWorkspace });
 
     if (this.saveTimeouts.has(note.id)) {
       clearTimeout(this.saveTimeouts.get(note.id));
@@ -320,9 +391,11 @@ class SupabaseCloudSyncManager {
 
     const timer = setTimeout(async () => {
       this.saveTimeouts.delete(note.id);
-      const latestNote = this.pendingNotes.get(note.id) || note;
+      const item = this.pendingNotes.get(note.id);
       this.pendingNotes.delete(note.id);
-      await this.saveNote(latestNote, true);
+      const noteToSave = item ? item.note : note;
+      const wsToSave = item ? item.workspaceId : targetWorkspace;
+      await this.saveNote(noteToSave, wsToSave, true);
     }, 300);
 
     this.saveTimeouts.set(note.id, timer);
@@ -338,12 +411,23 @@ class SupabaseCloudSyncManager {
     this.saveTimeouts.clear();
 
     await Promise.all(
-      entries.map(([, note]) => this.saveNote(note, useKeepalive))
+      entries.map(([, item]) => {
+        if (item && item.note) {
+          return this.saveNote(item.note, item.workspaceId, useKeepalive);
+        }
+        return this.saveNote(item, null, useKeepalive);
+      })
     );
   }
 
-  async deleteNote(noteId) {
+  async deleteNote(noteId, workspaceId = null, signal = null) {
     if (!noteId) return;
+    if (workspaceId && typeof workspaceId === 'object' && ('aborted' in workspaceId || (typeof AbortSignal !== 'undefined' && workspaceId instanceof AbortSignal))) {
+      signal = workspaceId;
+      workspaceId = null;
+    }
+    const targetWorkspace = workspaceId || this.getActiveWorkspaceId();
+
     if (this.saveTimeouts.has(noteId)) {
       clearTimeout(this.saveTimeouts.get(noteId));
       this.saveTimeouts.delete(noteId);
@@ -353,46 +437,64 @@ class SupabaseCloudSyncManager {
     try {
       this.lastLocalWriteTime = Date.now();
       this.updateStatus('syncing', 'Eliminando en Supabase...');
-      const workspaceId = encodeURIComponent(this.getActiveWorkspaceId());
+      const encodedWs = encodeURIComponent(targetWorkspace);
       const idParam = encodeURIComponent(String(noteId));
-      const url = `${SUPABASE_URL}/rest/v1/${TABLE_NAME}?workspace_id=eq.${workspaceId}&id=eq.${idParam}`;
+      const url = `${SUPABASE_URL}/rest/v1/${TABLE_NAME}?workspace_id=eq.${encodedWs}&id=eq.${idParam}`;
 
-      const res = await fetch(url, {
+      const fetchOptions = {
         method: 'DELETE',
         headers: this.getHeaders('return=minimal'),
         keepalive: true
-      });
+      };
+      if (signal) fetchOptions.signal = signal;
+
+      const res = await fetch(url, fetchOptions);
 
       if (!res.ok) {
         throw new Error(`Supabase delete error ${res.status}`);
       }
       this.updateStatus('synced', 'Eliminado en Supabase');
+      return { success: true };
     } catch (e) {
+      if (e.name === 'AbortError' || signal?.aborted) return { aborted: true };
       console.warn('Supabase delete failed:', e);
+      return null;
     }
   }
 
-  async uploadNotesBatch(notes) {
+  async uploadNotesBatch(notes, workspaceId = null, signal = null) {
     if (!notes || notes.length === 0) return;
+    if (workspaceId && typeof workspaceId === 'object' && ('aborted' in workspaceId || (typeof AbortSignal !== 'undefined' && workspaceId instanceof AbortSignal))) {
+      signal = workspaceId;
+      workspaceId = null;
+    }
+    const targetWorkspace = workspaceId || this.getActiveWorkspaceId();
+
     try {
       this.lastLocalWriteTime = Date.now();
       this.updateStatus('syncing', 'Sincronizando lote en Supabase...');
-      const rows = notes.filter(n => n && n.id).map(n => this.toDbRow(n));
+      const rows = notes.filter(n => n && n.id).map(n => this.toDbRow(n, targetWorkspace));
       if (rows.length === 0) return;
 
       const url = `${SUPABASE_URL}/rest/v1/${TABLE_NAME}?on_conflict=workspace_id,id`;
-      const res = await fetch(url, {
+      const fetchOptions = {
         method: 'POST',
         headers: this.getHeaders('resolution=merge-duplicates,return=minimal'),
         body: JSON.stringify(rows)
-      });
+      };
+      if (signal) fetchOptions.signal = signal;
+
+      const res = await fetch(url, fetchOptions);
 
       if (!res.ok) {
         throw new Error(`Supabase batch error ${res.status}`);
       }
       this.updateStatus('synced', 'Sincronizado en Supabase');
+      return { success: true };
     } catch (e) {
+      if (e.name === 'AbortError' || signal?.aborted) return { aborted: true };
       console.warn('Supabase batch upload error:', e);
+      return null;
     }
   }
 }
