@@ -1,9 +1,11 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Regla de seguridad estricta: Únicamente el propietario autenticado puede leer o escribir sus notas
+    // Regla de seguridad:
+    // 1. Cada usuario autenticado con Google es dueño exclusivo de /users/{uid}/notes
+    // 2. El espacio general /users/default_workspace/notes permite persistencia en la nube cuando no se ha iniciado sesión
     match /users/{userId}/{document=**} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read, write: if (request.auth != null && request.auth.uid == userId) || userId == 'default_workspace';
     }
   }
 }

@@ -5,8 +5,8 @@
 
 import { haptics } from './audio.js';
 import { NotesGraph } from './graph.js';
-import { CommandPalette } from './commands.js?v=2.3.0';
-import { firebaseSync } from './firebase.js';
+import { CommandPalette } from './commands.js?v=2.8.0';
+import { firebaseSync } from './firebase.js?v=2.8.0';
 
 const STORAGE_KEY = 'memora_data_v1';
 const LEGACY_STORAGE_KEY = 'auranotes_data_v2';
@@ -255,53 +255,70 @@ Escribe libremente aquí tu primer apunte o pensamiento.`
   }
 
   async syncUserData(user) {
-    if (user) {
-      // 1. Cargar notas desde el Firestore exclusivo de este usuario
-      const remoteNotes = await firebaseSync.loadNotes();
-      if (remoteNotes && remoteNotes.length > 0) {
-        remoteNotes.sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0));
-        this.notes = remoteNotes;
-      } else {
-        // Usuario nuevo: revisar si ya tenía notas en su propio almacenamiento local aislado
-        const userLocalKey = `memora_user_${user.uid}_notes`;
-        const localSaved = localStorage.getItem(userLocalKey);
-        if (localSaved) {
-          try {
-            this.notes = JSON.parse(localSaved);
-          } catch (e) {
-            this.notes = this.createStarterUserNotes(user);
-          }
-        } else {
-          this.notes = this.createStarterUserNotes(user);
-        }
-        await firebaseSync.uploadNotesBatch(this.notes);
-      }
-
-      this.saveLocalNotes();
-      this.renderNoteList();
-      if (this.notes.length > 0) {
-        this.selectNote(this.notes[0].id, false);
-      }
-
-      // 2. Escuchar cambios en vivo exclusivamente de este usuario
-      firebaseSync.listenLiveUpdates((updatedNotes) => {
-        if (updatedNotes && updatedNotes.length > 0) {
-          updatedNotes.sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0));
-          this.notes = updatedNotes;
-          this.saveLocalNotes();
-          this.renderNoteList();
-          if (this.currentView === 'broadsheet') this.renderBroadsheet();
-          if (this.currentView === 'graph' && this.graph) this.graph.setData(this.notes);
-        }
-      });
+    // 1. Cargar notas desde Cloud Firestore (espacio privado del usuario Google o espacio cloud por defecto)
+    const remoteNotes = await firebaseSync.loadNotes();
+    if (remoteNotes && remoteNotes.length > 0) {
+      remoteNotes.sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0));
+      this.notes = remoteNotes;
     } else {
-      // Sesión cerrada / Modo invitado: cargar espacio de invitado totalmente separado
-      this.loadLocalNotes();
-      this.renderNoteList();
-      if (this.notes.length > 0) {
-        this.selectNote(this.notes[0].id, false);
+      // Si la colección remota aún está vacía, recuperar del caché local correspondiente o inicializar semilla
+      const localKey = this.getStorageKey();
+      const localSaved = localStorage.getItem(localKey);
+      if (localSaved) {
+        try {
+          this.notes = JSON.parse(localSaved);
+        } catch (e) {
+          this.notes = user ? this.createStarterUserNotes(user) : SEED_NOTES;
+        }
+      } else {
+        this.notes = user ? this.createStarterUserNotes(user) : SEED_NOTES;
       }
+      await firebaseSync.uploadNotesBatch(this.notes);
     }
+
+    this.saveLocalNotes();
+    this.renderNoteList();
+    const activeNotes = this.getActiveNotes();
+    if (activeNotes.length > 0) {
+      const keepCurrent = activeNotes.find(n => n.id === this.activeNoteId);
+      this.selectNote(keepCurrent ? keepCurrent.id : activeNotes[0].id, false);
+    }
+
+    // 2. Escuchar cambios en vivo desde Cloud Firestore
+    firebaseSync.listenLiveUpdates((updatedNotes) => {
+      if (updatedNotes && updatedNotes.length > 0) {
+        const isTyping =
+          document.activeElement === this.dom.titleInput ||
+          document.activeElement === this.dom.editorBody ||
+          (this.dom.editorBody && this.dom.editorBody.contains(document.activeElement));
+
+        updatedNotes.sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0));
+
+        if (isTyping && this.activeNoteId) {
+          const currentLocal = this.notes.find(n => n.id === this.activeNoteId);
+          if (currentLocal) {
+            const idx = updatedNotes.findIndex(n => n.id === this.activeNoteId);
+            if (idx > -1) {
+              updatedNotes[idx] = currentLocal;
+            } else {
+              updatedNotes.unshift(currentLocal);
+            }
+          }
+        }
+
+        this.notes = updatedNotes;
+        this.saveLocalNotes();
+        this.renderNoteList();
+        if (!isTyping && this.activeNoteId) {
+          const active = this.notes.find(n => n.id === this.activeNoteId && !n.isDeleted);
+          if (active) {
+            this.selectNote(active.id, false);
+          }
+        }
+        if (this.currentView === 'broadsheet') this.renderBroadsheet();
+        if (this.currentView === 'graph' && this.graph) this.graph.setData(this.getActiveNotes());
+      }
+    });
   }
 
   async handleGoogleLogin() {
@@ -326,11 +343,7 @@ Escribe libremente aquí tu primer apunte o pensamiento.`
       await firebaseSync.signOutUser();
       this.currentUser = null;
       this.updateAuthUI(null);
-      this.loadLocalNotes();
-      this.renderNoteList();
-      if (this.notes.length > 0) {
-        this.selectNote(this.notes[0].id, false);
-      }
+      await this.syncUserData(null);
       this.showToast('Has cerrado sesión en Google.');
     } catch (err) {
       console.warn('Signout error:', err);
@@ -338,13 +351,10 @@ Escribe libremente aquí tu primer apunte o pensamiento.`
   }
 
   async handleForceSyncCloud() {
-    if (!firebaseSync.currentUser) {
-      this.showToast('Inicia sesión con Google para sincronizar en la nube.');
-      return;
-    }
-    this.showToast('Sincronizando notas con Firebase...');
+    this.showToast('Sincronizando notas con la base de datos en la nube...');
+    await firebaseSync.flushPendingSaves();
     await firebaseSync.uploadNotesBatch(this.notes);
-    this.showToast('Notas sincronizadas en la nube.');
+    this.showToast('Base de datos sincronizada permanentemente.');
   }
 
   updateSyncBadge(status, text) {
@@ -945,7 +955,7 @@ Escribe libremente aquí tu primer apunte o pensamiento.`
     };
     this.notes.unshift(newNote);
     this.saveLocalNotes();
-    firebaseSync.saveNoteLive(newNote);
+    firebaseSync.saveNote(newNote);
     this.renderNoteList();
     this.selectNote(newNote.id);
     this.dom.titleInput.focus();
@@ -1010,14 +1020,25 @@ Escribe libremente aquí tu primer apunte o pensamiento.`
     const note = this.notes.find(n => n.id === this.activeNoteId);
     if (!note) return;
 
+    note.content = this.getEditorContent();
+
     if (this.dom.titleInput) {
-      note.title = this.dom.titleInput.innerText ? this.dom.titleInput.innerText.replace(/\r?\n/g, ' ').trim() : (this.dom.titleInput.value || 'Nota sin título');
+      let rawTitle = this.dom.titleInput.innerText ? this.dom.titleInput.innerText.replace(/\r?\n/g, ' ').trim() : '';
+      if (!rawTitle && note.content) {
+        const firstLine = note.content
+          .split('\n')
+          .map(l => l.replace(/^[#*>\-\s]+/, '').trim())
+          .find(l => l.length > 0 && !l.startsWith('!['));
+        if (firstLine) {
+          rawTitle = firstLine.slice(0, 65);
+        }
+      }
+      note.title = rawTitle || 'Nota sin título';
       note.titleHtml = this.dom.titleInput.innerHTML;
       note.titleColor = this.dom.titleInput.style.color || '';
     } else {
       note.title = 'Nota sin título';
     }
-    note.content = this.getEditorContent();
     note.updatedAt = new Date().toISOString();
 
     this.saveLocalNotes();
@@ -2396,7 +2417,7 @@ Escribe libremente aquí tu primer apunte o pensamiento.`
     note.isPinned = false;
 
     this.saveLocalNotes();
-    firebaseSync.saveNoteLive(note);
+    firebaseSync.saveNote(note);
 
     this.updateTrashBadge();
     this.renderNoteList();
@@ -2425,7 +2446,7 @@ Escribe libremente aquí tu primer apunte o pensamiento.`
     note.updatedAt = new Date().toISOString();
 
     this.saveLocalNotes();
-    firebaseSync.saveNoteLive(note);
+    firebaseSync.saveNote(note);
 
     this.updateTrashBadge();
     this.renderNoteList();
@@ -2700,7 +2721,7 @@ Escribe libremente aquí tu primer apunte o pensamiento.`
     }
 
     this.saveLocalNotes();
-    firebaseSync.saveNoteLive(note);
+    firebaseSync.saveNote(note);
     this.renderNoteList();
 
     if (this.activeNoteId === id) {
